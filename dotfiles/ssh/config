@@ -1,0 +1,16 @@
+# ~/.ssh/config — truenas_admin
+# Managed via git: /mnt/cell_block_d/repos/truenas/dotfiles/ssh/config
+
+# GitHub — use the key deployed at /root/.ssh (shared with provisioner)
+Host github.com
+  HostName github.com
+  User git
+  IdentityFile ~/.ssh/id_ed25519
+  IdentitiesOnly yes
+  ServerAliveInterval 60
+
+# Default: harden all connections
+Host *
+  ServerAliveInterval 60
+  ServerAliveCountMax 3
+  StrictHostKeyChecking accept-new

@@ -1,0 +1,5 @@
+# ~/.zprofile — login shell env for truenas_admin
+# Managed via git: /mnt/cell_block_d/repos/truenas/dotfiles/zprofile
+
+# Ensure .zshrc is sourced for login shells too
+[[ -f "$HOME/.zshrc" ]] && source "$HOME/.zshrc"

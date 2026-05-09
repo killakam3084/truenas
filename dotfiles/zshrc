@@ -1,0 +1,69 @@
+# ~/.zshrc — truenas_admin
+# Managed via git: /mnt/cell_block_d/repos/truenas/dotfiles/zshrc
+
+# ── Environment ──────────────────────────────────────────────────────────────
+export EDITOR=vim
+export PAGER=less
+export PATH="$HOME/.local/bin:/usr/local/bin:$PATH"
+
+# Monorepo root (available everywhere)
+export TRUENAS_REPO=/mnt/cell_block_d/repos/truenas
+export APPS_DIR=/mnt/cell_block_d/apps
+
+# ── Prompt ───────────────────────────────────────────────────────────────────
+autoload -Uz colors && colors
+setopt PROMPT_SUBST
+PROMPT='%F{cyan}%n@%m%f %F{yellow}[%3~]%f$ '
+
+# ── History ──────────────────────────────────────────────────────────────────
+HISTFILE="$HOME/.zsh_history"
+HISTSIZE=10000
+SAVEHIST=10000
+setopt SHARE_HISTORY
+setopt HIST_IGNORE_DUPS
+setopt HIST_IGNORE_SPACE
+
+# ── Completion ───────────────────────────────────────────────────────────────
+autoload -Uz compinit && compinit
+
+# ── Aliases — general ────────────────────────────────────────────────────────
+alias ll='ls -lahtr'
+alias ..='cd ..'
+alias ...='cd ../..'
+
+# ── Aliases — provisioner ────────────────────────────────────────────────────
+alias prov='sudo docker exec -it provisioner bash'
+
+# ── Aliases — repo shortcuts (run from inside provisioner) ───────────────────
+alias trepo='cd $TRUENAS_REPO'
+alias tpull='make -C $TRUENAS_REPO pull'
+alias tnginx='make -C $TRUENAS_REPO nginx-reload'
+
+# ── Aliases — docker ─────────────────────────────────────────────────────────
+alias dps='sudo docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"'
+alias dlogs='sudo docker logs -f'
+alias dexec='sudo docker exec -it'
+
+# ── Aliases — app deploy (run from inside provisioner) ───────────────────────
+alias curator-up='make -C $TRUENAS_REPO rss-curator-up'
+alias curator-down='make -C $TRUENAS_REPO rss-curator-down'
+alias rarclean-up='make -C $TRUENAS_REPO rarclean-up'
+alias rarclean-down='make -C $TRUENAS_REPO rarclean-down'
+alias certrenew-dry='make -C $TRUENAS_REPO certrenew-dry-run'
+alias certrenew-run='make -C $TRUENAS_REPO certrenew-run'
+
+# ── Aliases — nginx ──────────────────────────────────────────────────────────
+alias nginx-reload='make -C $TRUENAS_REPO nginx-reload'
+alias nginx-logs='sudo docker logs -f nginx-proxy'
+
+# ── Functions ────────────────────────────────────────────────────────────────
+
+# Quick: tail logs for any container
+logs() { sudo docker logs -f --tail=100 "$1"; }
+
+# Quick: pull and redeploy everything
+deploy-all() {
+  make -C "$TRUENAS_REPO" pull
+  make -C "$TRUENAS_REPO" rss-curator-up
+  make -C "$TRUENAS_REPO" rarclean-up
+}

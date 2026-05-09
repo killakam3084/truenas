@@ -1,0 +1,9 @@
+# /etc/sudoers.d/truenas_admin
+# Managed via git: /mnt/cell_block_d/repos/truenas/dotfiles/sudoers.d/truenas_admin
+# Install: sudo install -m 0440 this_file /etc/sudoers.d/truenas_admin
+#
+# Grants truenas_admin passwordless sudo for docker and make operations
+# so day-to-day ops don't require repeated password entry.
+
+# Full passwordless sudo (TrueNAS default — keep broad for now)
+truenas_admin ALL=(ALL) NOPASSWD: ALL

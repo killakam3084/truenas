@@ -2,7 +2,7 @@
         certrenew-run certrenew-dry-run \
         rss-curator-up rss-curator-down \
         rarclean-up rarclean-down \
-        help
+        dotfiles help
 
 REPO_DIR      := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 INFISICAL_DIR := $(REPO_DIR)infisical
@@ -69,6 +69,10 @@ rarclean-up:
 ## Stop rarclean
 rarclean-down:
 	docker compose -f $(REPO_DIR)rarclean/docker-compose.truenas.yml down
+
+## Apply dotfiles for truenas_admin (run as truenas_admin on host, not inside provisioner)
+dotfiles:
+	bash $(REPO_DIR)dotfiles/bootstrap.sh
 
 ## Show available targets
 help:
