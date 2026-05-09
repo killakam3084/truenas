@@ -3,12 +3,15 @@
         rss-curator-up rss-curator-down \
         rarclean-up rarclean-down \
         qbittorrent-up qbittorrent-down \
+        vuetorrent-install \
         dotfiles help
 
-REPO_DIR      := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
-INFISICAL_DIR := $(REPO_DIR)infisical
-INFISICAL_URL := https://infisical.iillmaticc.link
-APPS_DIR      := /mnt/cell_block_d/apps
+REPO_DIR           := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
+INFISICAL_DIR      := $(REPO_DIR)infisical
+INFISICAL_URL      := https://infisical.iillmaticc.link
+APPS_DIR           := /mnt/cell_block_d/apps
+VUETORRENT_VERSION := $(shell cat $(REPO_DIR)themes/vuetorrent.version)
+QBIT_THEMES_DIR    := $(APPS_DIR)/qbittorrent-vpn/config/themes
 
 # Helper: run a command with secrets injected from an app's .env
 # Usage: $(call infisical-run,<app>,<projectId>,<cmd...>)
@@ -72,13 +75,30 @@ rarclean-down:
 	docker compose -f $(REPO_DIR)rarclean/docker-compose.truenas.yml down
 
 ## Deploy qbittorrent-vpn stack (gluetun + qbittorrent + port-sync) with secrets from Infisical
-qbittorrent-up:
+qbittorrent-up: vuetorrent-install
 	$(call infisical-run,qbittorrent-vpn,$$(. $(APPS_DIR)/qbittorrent-vpn/.env && echo $$INFISICAL_PROJECT_ID),\
 	  docker compose -f $(REPO_DIR)port-sync/docker-compose.truenas.yml up -d)
 
 ## Stop qbittorrent-vpn stack
 qbittorrent-down:
 	docker compose -f $(REPO_DIR)port-sync/docker-compose.truenas.yml down
+
+## Install (or upgrade) VueTorrent theme — no-op if already at pinned version
+## To upgrade: edit themes/vuetorrent.version; no container restart needed
+vuetorrent-install:
+	@installed=$$(cat $(QBIT_THEMES_DIR)/vuetorrent/version.txt 2>/dev/null); \
+	if [ "$$installed" = "$(VUETORRENT_VERSION)" ]; then \
+	  echo "VueTorrent $(VUETORRENT_VERSION) already installed, skipping"; \
+	else \
+	  echo "Installing VueTorrent $(VUETORRENT_VERSION)..."; \
+	  mkdir -p $(QBIT_THEMES_DIR); \
+	  rm -rf $(QBIT_THEMES_DIR)/vuetorrent; \
+	  curl -fsSL https://github.com/VueTorrent/VueTorrent/releases/download/v$(VUETORRENT_VERSION)/vuetorrent.zip \
+	    -o /tmp/vuetorrent.zip; \
+	  unzip -q /tmp/vuetorrent.zip -d $(QBIT_THEMES_DIR); \
+	  rm /tmp/vuetorrent.zip; \
+	  echo "VueTorrent $(VUETORRENT_VERSION) installed to $(QBIT_THEMES_DIR)/vuetorrent"; \
+	fi
 
 ## Apply dotfiles for truenas_admin (run as truenas_admin on host, not inside provisioner)
 dotfiles:
