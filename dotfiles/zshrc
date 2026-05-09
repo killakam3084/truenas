@@ -30,9 +30,11 @@ autoload -Uz compinit && compinit
 alias ll='ls -lahtr'
 alias ..='cd ..'
 alias ...='cd ../..'
+alias tree='tree -C'
 
 # ── Aliases — provisioner ────────────────────────────────────────────────────
 alias prov='sudo docker exec -it provisioner bash'
+alias tree='sudo docker exec provisioner tree -C'
 
 # ── Aliases — repo shortcuts (run from inside provisioner) ───────────────────
 alias trepo='cd $TRUENAS_REPO'
