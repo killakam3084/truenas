@@ -2,6 +2,7 @@
         certrenew-run certrenew-dry-run \
         rss-curator-up rss-curator-down \
         rarclean-up rarclean-down \
+        qbittorrent-up qbittorrent-down \
         dotfiles help
 
 REPO_DIR      := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
@@ -69,6 +70,15 @@ rarclean-up:
 ## Stop rarclean
 rarclean-down:
 	docker compose -f $(REPO_DIR)rarclean/docker-compose.truenas.yml down
+
+## Deploy qbittorrent-vpn stack (gluetun + qbittorrent + port-sync) with secrets from Infisical
+qbittorrent-up:
+	$(call infisical-run,qbittorrent-vpn,$$(. $(APPS_DIR)/qbittorrent-vpn/.env && echo $$INFISICAL_PROJECT_ID),\
+	  docker compose -f $(REPO_DIR)port-sync/docker-compose.truenas.yml up -d)
+
+## Stop qbittorrent-vpn stack
+qbittorrent-down:
+	docker compose -f $(REPO_DIR)port-sync/docker-compose.truenas.yml down
 
 ## Apply dotfiles for truenas_admin (run as truenas_admin on host, not inside provisioner)
 dotfiles:
