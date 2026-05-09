@@ -34,6 +34,7 @@ alias tree='tree -C'
 
 # ── Aliases — provisioner ────────────────────────────────────────────────────
 alias prov='sudo docker exec -it provisioner bash'
+alias make='sudo docker exec provisioner make'
 alias tree='sudo docker exec provisioner tree -C'
 
 # ── Aliases — repo shortcuts (run from inside provisioner) ───────────────────
@@ -53,6 +54,9 @@ alias rarclean-up='make -C $TRUENAS_REPO rarclean-up'
 alias rarclean-down='make -C $TRUENAS_REPO rarclean-down'
 alias certrenew-dry='make -C $TRUENAS_REPO certrenew-dry-run'
 alias certrenew-run='make -C $TRUENAS_REPO certrenew-run'
+alias qbt-up='make -C $TRUENAS_REPO qbittorrent-up'
+alias qbt-down='make -C $TRUENAS_REPO qbittorrent-down'
+alias vuetorrent-install='make -C $TRUENAS_REPO vuetorrent-install'
 
 # ── Aliases — nginx ──────────────────────────────────────────────────────────
 alias nginx-reload='make -C $TRUENAS_REPO nginx-reload'
