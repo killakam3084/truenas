@@ -1,0 +1,18 @@
+[submodule "certrenew"]
+	path = certrenew
+	url = git@github.com:killakam3084/certrenew.git
+[submodule "port-sync"]
+	path = port-sync
+	url = git@github.com:killakam3084/port-sync.git
+[submodule "rarclean"]
+	path = rarclean
+	url = git@github.com:killakam3084/rarclean.git
+[submodule "rss-curator"]
+	path = rss-curator
+	url = git@github.com:killakam3084/rss-curator.git
+[submodule "truenas-nginx-config"]
+	path = truenas-nginx-config
+	url = git@github.com:killakam3084/truenas-nginx-config.git
+[submodule "truenas-provisioning-image"]
+	path = truenas-provisioning-image
+	url = git@github.com:killakam3084/truenas-provisioning-image.git
