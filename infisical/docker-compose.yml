@@ -1,0 +1,49 @@
+services:
+  backend:
+    container_name: infisical-backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    image: infisical/infisical:latest
+    pull_policy: always
+    env_file: .env
+    environment:
+      - NODE_ENV=production
+    ports:
+      - "127.0.0.1:9090:8080"
+    networks:
+      - infisical
+
+  redis:
+    image: redis:7-alpine
+    container_name: infisical-redis
+    env_file: .env
+    restart: unless-stopped
+    environment:
+      - ALLOW_EMPTY_PASSWORD=yes
+    networks:
+      - infisical
+    volumes:
+      - /mnt/cell_block_d/apps/infisical/redis:/data
+
+  db:
+    container_name: infisical-db
+    image: postgres:16-alpine
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - /mnt/cell_block_d/apps/infisical/postgres:/var/lib/postgresql/data
+    networks:
+      - infisical
+    healthcheck:
+      test: "pg_isready --username=${POSTGRES_USER} && psql --username=${POSTGRES_USER} --list"
+      interval: 5s
+      timeout: 10s
+      retries: 10
+
+networks:
+  infisical:
+    driver: bridge
