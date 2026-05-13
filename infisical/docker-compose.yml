@@ -26,6 +26,12 @@ services:
       - ALLOW_EMPTY_PASSWORD=yes
     networks:
       - infisical
+        healthcheck:
+          test: ["CMD", "redis-cli", "ping"]
+          interval: 10s
+          timeout: 3s
+          retries: 5
+          start_period: 5s
     volumes:
       - /mnt/cell_block_d/apps/infisical/redis:/data
 
@@ -34,7 +40,7 @@ services:
     image: postgres:16-alpine
     restart: unless-stopped
     env_file: .env
-    volumes:
+            condition: service_healthy
       - /mnt/cell_block_d/apps/infisical/postgres:/var/lib/postgresql/data
     networks:
       - infisical
@@ -44,6 +50,12 @@ services:
       timeout: 10s
       retries: 10
 
+        healthcheck:
+          test: ["CMD-SHELL", "curl -sf http://localhost:8080/api/status"]
+          interval: 15s
+          timeout: 5s
+          retries: 5
+          start_period: 30s
 networks:
   infisical:
     driver: bridge
