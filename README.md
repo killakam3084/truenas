@@ -28,10 +28,15 @@ All targets are run from inside the provisioner container, or via the `make` ali
 | Target | Description |
 |---|---|
 | `make init` | Initialize submodules after a plain `git clone` |
-| `make pull` | Pull latest on all submodules + advance pinned commits |
+| `make pull` | Pull latest on parent repo + all submodules, then advance pinned commits |
+| `make nginx-up` | Start nginx-proxy stack |
+| `make nginx-down` | Stop nginx-proxy stack |
 | `make nginx-reload` | Pull + send HUP to nginx-proxy container |
 | `make infisical-up` | Start Infisical stack |
 | `make infisical-down` | Stop Infisical stack |
+| `make roon-up` | Start RoonServer stack |
+| `make roon-down` | Stop RoonServer stack |
+| `make roon-restart` | Restart RoonServer (down + up -d) |
 | `make certrenew-dry-run` | Dry-run cert renewal (prints plan, no changes) |
 | `make certrenew-run` | Live cert renewal |
 | `make rss-curator-up` | Deploy rss-curator stack with Infisical secrets |
@@ -42,6 +47,20 @@ All targets are run from inside the provisioner container, or via the `make` ali
 | `make qbittorrent-down` | Stop qbittorrent-vpn stack |
 | `make vuetorrent-install` | Install/upgrade VueTorrent theme (no-op if already at pinned version) |
 | `make dotfiles` | Apply `truenas_admin` dotfiles on the host |
+
+## Healthchecks
+
+Production compose stacks now include healthchecks for long-running services:
+
+- `nginx-proxy`: HTTP liveness probe via localhost
+- `rss-curator`: `/api/health` endpoint probe
+- `gluetun`: built-in health server probe (`127.0.0.1:9999`)
+- `qbittorrent`: `/api/v2/app/version` probe
+- `qbittorrent-port-sync`: process liveness probe
+- `infisical-backend`: `/api/status` endpoint probe
+- `infisical-redis`: `redis-cli ping`
+- `infisical-db`: `pg_isready` probe
+- `roonserver`: `pgrep` process probe
 
 ## Secrets (Infisical)
 
@@ -80,6 +99,7 @@ No container restart needed — qBittorrent serves the theme directory as static
     qbittorrent-vpn/      .env
                           config/themes/vuetorrent/   ← installed by make vuetorrent-install
     infisical/            .env
+    roon/                 app/ data/ backups/
     nginx-proxy/          (runtime state)
 ```
 
