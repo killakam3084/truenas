@@ -29,8 +29,9 @@ endef
 init:
 	git submodule update --init --recursive
 
-## Pull latest commits for all submodules (advances pinned commits)
+## Pull latest commits for parent repo and all submodules (advances pinned commits)
 pull:
+	git pull origin main
 	git submodule foreach git pull origin main
 	git add .
 	git commit -m "chore: advance submodule pins" || true
