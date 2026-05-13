@@ -1,4 +1,4 @@
-.PHONY: init pull nginx-reload infisical-up infisical-down \
+.PHONY: init pull nginx-up nginx-down nginx-reload infisical-up infisical-down \
         certrenew-run certrenew-dry-run \
         rss-curator-up rss-curator-down \
         rarclean-up rarclean-down \
@@ -8,6 +8,7 @@
 
 REPO_DIR           := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 INFISICAL_DIR      := $(REPO_DIR)infisical
+NGINX_DIR          := $(REPO_DIR)truenas-nginx-config
 INFISICAL_URL      := https://infisical.iillmaticc.link
 APPS_DIR           := /mnt/cell_block_d/apps
 VUETORRENT_VERSION := $(shell cat $(REPO_DIR)themes/vuetorrent.version)
@@ -35,6 +36,14 @@ pull:
 	git submodule foreach git pull origin main
 	git add .
 	git commit -m "chore: advance submodule pins" || true
+
+## Start nginx-proxy stack (host-network reverse proxy)
+nginx-up:
+	docker compose -f $(NGINX_DIR)/docker-compose.yml up -d
+
+## Stop nginx-proxy stack
+nginx-down:
+	docker compose -f $(NGINX_DIR)/docker-compose.yml down
 
 ## Reload nginx-proxy config (pull submodules then signal nginx)
 ## Requires docker CLI access — run from provisioning container or host
