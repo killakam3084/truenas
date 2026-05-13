@@ -45,8 +45,7 @@ nginx-up:
 nginx-down:
 	docker compose -f $(NGINX_DIR)/docker-compose.yml down
 
-## Reload nginx-proxy config (pull submodules then signal nginx)
-## Requires docker CLI access — run from provisioning container or host
+## Reload nginx-proxy config (pull submodules then signal nginx; requires docker CLI access)
 nginx-reload: pull
 	docker kill --signal=HUP nginx-proxy
 
