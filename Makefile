@@ -106,4 +106,7 @@ dotfiles:
 
 ## Show available targets
 help:
-	@grep -E '^##' Makefile | sed 's/## //'
+	@echo "Available make targets:"
+	@echo ""
+	@awk '/^##/ { desc=substr($$0, 4); getline; if (match($$0, /^[a-zA-Z_][a-zA-Z0-9_-]*:/)) { target=substr($$0, 1, RLENGTH-1); printf "  %-25s %s\n", target, desc } }' Makefile | sort
+	@echo ""
