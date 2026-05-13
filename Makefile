@@ -1,5 +1,5 @@
 .PHONY: init pull nginx-up nginx-down nginx-reload infisical-up infisical-down \
-        roon-up roon-down \
+        roon-up roon-down roon-restart \
         certrenew-run certrenew-dry-run \
         rss-curator-up rss-curator-down \
         rarclean-up rarclean-down \
@@ -66,6 +66,11 @@ roon-up:
 ## Stop RoonServer stack
 roon-down:
 	docker compose -f $(ROON_DIR)/docker-compose.yml down
+
+## Restart RoonServer (stop then start; use when Roon glitches out)
+roon-restart:
+	docker compose -f $(ROON_DIR)/docker-compose.yml down
+	docker compose -f $(ROON_DIR)/docker-compose.yml up -d
 
 ## Run certrenew (dry-run — prints plan, executes nothing)
 certrenew-dry-run:
