@@ -1,0 +1,14 @@
+services:
+  roonserver:
+    container_name: roonserver
+    image: gz1903/roonserver:latest
+    pull_policy: always
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      - TZ=America/Chicago
+    volumes:
+      - /mnt/cell_block_d/apps/roon/app:/app
+      - /mnt/cell_block_d/apps/roon/data:/data
+      - /mnt/cell_block_d/media/audio/music:/music:ro
+      - /mnt/cell_block_d/apps/roon/backups:/backup

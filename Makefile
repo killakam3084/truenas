@@ -1,4 +1,5 @@
 .PHONY: init pull nginx-up nginx-down nginx-reload infisical-up infisical-down \
+        roon-up roon-down \
         certrenew-run certrenew-dry-run \
         rss-curator-up rss-curator-down \
         rarclean-up rarclean-down \
@@ -9,6 +10,7 @@
 REPO_DIR           := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 INFISICAL_DIR      := $(REPO_DIR)infisical
 NGINX_DIR          := $(REPO_DIR)truenas-nginx-config
+ROON_DIR           := $(REPO_DIR)roon
 INFISICAL_URL      := https://infisical.iillmaticc.link
 APPS_DIR           := /mnt/cell_block_d/apps
 VUETORRENT_VERSION := $(shell cat $(REPO_DIR)themes/vuetorrent.version)
@@ -56,6 +58,14 @@ infisical-up:
 ## Stop Infisical
 infisical-down:
 	docker compose -f $(INFISICAL_DIR)/docker-compose.yml --env-file $(INFISICAL_DIR)/.env down
+
+## Start RoonServer stack
+roon-up:
+	docker compose -f $(ROON_DIR)/docker-compose.yml up -d
+
+## Stop RoonServer stack
+roon-down:
+	docker compose -f $(ROON_DIR)/docker-compose.yml down
 
 ## Run certrenew (dry-run — prints plan, executes nothing)
 certrenew-dry-run:
