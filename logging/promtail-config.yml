@@ -1,0 +1,34 @@
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://localhost:3100/loki/api/v1/push
+
+scrape_configs:
+  # --- Docker containers (all stdout/stderr via Docker daemon) ---
+  - job_name: docker
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 5s
+    relabel_configs:
+      # Strip leading slash from container name → use as job and container labels
+      - source_labels: [__meta_docker_container_name]
+        regex: /(.*)
+        target_label: container
+      - source_labels: [__meta_docker_container_name]
+        regex: /(.*)
+        target_label: job
+      - source_labels: [__meta_docker_container_image]
+        target_label: image
+
+  # --- Nginx file logs (access + error) ---
+  - job_name: nginx
+    static_configs:
+      - targets: [localhost]
+        labels:
+          job: nginx
+          __path__: /var/log/nginx/*.log

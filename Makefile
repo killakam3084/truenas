@@ -5,12 +5,14 @@
         rarclean-up rarclean-down \
         qbittorrent-up qbittorrent-down \
         vuetorrent-install \
+        logging-up logging-down \
         dotfiles help
 
 REPO_DIR           := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 INFISICAL_DIR      := $(REPO_DIR)infisical
 NGINX_DIR          := $(REPO_DIR)truenas-nginx-config
 ROON_DIR           := $(REPO_DIR)roon
+LOGGING_DIR        := $(REPO_DIR)logging
 INFISICAL_URL      := https://infisical.iillmaticc.link
 APPS_DIR           := /mnt/cell_block_d/apps
 VUETORRENT_VERSION := $(shell cat $(REPO_DIR)themes/vuetorrent.version)
@@ -123,6 +125,15 @@ vuetorrent-install:
 	  rm /tmp/vuetorrent.zip; \
 	  echo "VueTorrent $(VUETORRENT_VERSION) installed to $(QBIT_THEMES_DIR)/vuetorrent"; \
 	fi
+
+## Start Loki + Promtail logging stack
+logging-up:
+	mkdir -p /mnt/cell_block_d/apps/loki/data
+	docker compose -f $(LOGGING_DIR)/docker-compose.truenas.yml up -d
+
+## Stop Loki + Promtail logging stack
+logging-down:
+	docker compose -f $(LOGGING_DIR)/docker-compose.truenas.yml down
 
 ## Apply dotfiles for truenas_admin (run as truenas_admin on host, not inside provisioner)
 dotfiles:
