@@ -39,3 +39,4 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
       - /mnt/cell_block_d/apps/nginx-proxy/logs:/var/log/nginx:ro
+      - /mnt/cell_block_d/apps/rarclean:/var/log/rarclean:ro

@@ -32,3 +32,12 @@ scrape_configs:
         labels:
           job: nginx
           __path__: /var/log/nginx/*.log
+
+  # --- rarclean file log ---
+  - job_name: rarclean
+    static_configs:
+      - targets: [localhost]
+        labels:
+          job: rarclean
+          __path__: /var/log/rarclean/rarclean.log
+          # host path: /mnt/cell_block_d/apps/rarclean/rarclean.log
