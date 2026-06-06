@@ -5,7 +5,7 @@
 #   mkdir -p /mnt/cell_block_d/apps/loki/data
 #
 # After deploying, add a Loki datasource in Grafana:
-#   URL: http://192.168.68.60:3100
+#   URL: http://<host-lan-ip>:3100  (use current LAN IP — Grafana runs bridged, not host-mode)
 
 services:
   loki:
@@ -40,3 +40,4 @@ services:
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
       - /mnt/cell_block_d/apps/nginx-proxy/logs:/var/log/nginx:ro
       - /mnt/cell_block_d/apps/rarclean:/var/log/rarclean:ro
+      - /mnt/cell_block_d/apps/roon/data/RoonServer/Logs:/var/log/roon:ro

@@ -41,3 +41,12 @@ scrape_configs:
           job: rarclean
           __path__: /var/log/rarclean/rarclean.log
           # host path: /mnt/cell_block_d/apps/rarclean/rarclean.log
+
+  # --- Roon Server file logs ---
+  - job_name: roon
+    static_configs:
+      - targets: [localhost]
+        labels:
+          job: roon
+          __path__: /var/log/roon/RoonServer_log*.txt
+          # host path: /mnt/cell_block_d/apps/roon/data/RoonServer/Logs/
