@@ -26,8 +26,7 @@ define infisical-run
 	  --domain=$(INFISICAL_URL) \
 	  --projectId=$(2) \
 	  --env=$${INFISICAL_ENV:-prod} \
-	  --clientId=$${INFISICAL_CLIENT_ID} \
-	  --clientSecret=$${INFISICAL_CLIENT_SECRET} \
+	  --token=$${INFISICAL_TOKEN} \
 	  -- $(3)
 endef
 
