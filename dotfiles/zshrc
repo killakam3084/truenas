@@ -26,6 +26,13 @@ setopt HIST_IGNORE_SPACE
 # ── Completion ───────────────────────────────────────────────────────────────
 autoload -Uz compinit && compinit
 
+# ── Keybindings ──────────────────────────────────────────────────────────────
+# Enable familiar Ctrl+R/Ctrl+S incremental history search.
+stty -ixon
+bindkey -e
+bindkey '^R' history-incremental-search-backward
+bindkey '^S' history-incremental-search-forward
+
 # ── Aliases — general ────────────────────────────────────────────────────────
 alias ll='ls -lahtr'
 alias ..='cd ..'
