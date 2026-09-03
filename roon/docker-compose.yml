@@ -1,17 +1,18 @@
 services:
   roonserver:
     container_name: roonserver
-    image: gz1903/roonserver:latest
+    image: ghcr.io/roonlabs/roonserver:latest
+    platform: linux/amd64
     pull_policy: always
     restart: unless-stopped
     network_mode: host
     environment:
+      - ROON_INSTALL_BRANCH=production
       - TZ=America/Chicago
     volumes:
-      - /mnt/cell_block_d/apps/roon/app:/app
-      - /mnt/cell_block_d/apps/roon/data:/data
-      - /mnt/cell_block_d/media/audio/music:/music:ro
-      - /mnt/cell_block_d/apps/roon/backups:/backup
+      - /mnt/cell_block_d/apps/roon/data:/Roon
+      - /mnt/cell_block_d/media/audio/music:/Music:ro
+      - /mnt/cell_block_d/apps/roon/backups:/RoonBackups
     healthcheck:
       # Roon has no HTTP API — check the main process is alive
       test: ["CMD-SHELL", "pgrep -f RoonServer > /dev/null"]

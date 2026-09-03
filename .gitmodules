@@ -13,3 +13,6 @@
 [submodule "truenas-provisioning-image"]
 	path = truenas-provisioning-image
 	url = git@github.com:killakam3084/truenas-provisioning-image.git
+[submodule "truenas-nginx-config"]
+	path = truenas-nginx-config
+	url = git@github.com:killakam3084/truenas-nginx-config.git
