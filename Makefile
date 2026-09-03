@@ -38,13 +38,14 @@ init:
 
 ## Pull latest commits for parent repo and all submodules (advances pinned commits)
 pull:
-	git pull origin main
+	git pull --rebase origin main
 	git -C certrenew pull origin main
 	git -C port-sync pull origin main
 	git -C rarclean pull origin main
 	git -C rss-curator pull origin main
+	git -C truenas-nginx-config pull origin main
 	git -C truenas-provisioning-image pull origin main
-	git add .gitmodules certrenew port-sync rarclean rss-curator truenas-provisioning-image
+	git add .gitmodules certrenew port-sync rarclean rss-curator truenas-nginx-config truenas-provisioning-image
 	git -c user.name=$(GIT_USER_NAME) -c user.email=$(GIT_USER_EMAIL) commit -m "chore: advance submodule pins" || true
 
 ## Start nginx-proxy stack (host-network reverse proxy)
