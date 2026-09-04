@@ -38,13 +38,32 @@ init:
 
 ## Pull latest commits for parent repo and all submodules (advances pinned commits)
 pull:
+	@set -e; \
+	rebase_merge=$$(git rev-parse --git-path rebase-merge); \
+	rebase_apply=$$(git rev-parse --git-path rebase-apply); \
+	if [ -d "$$rebase_merge" ] || [ -d "$$rebase_apply" ]; then \
+	  echo "Detected unfinished rebase in parent repo; aborting stale state"; \
+	  git rebase --abort || true; \
+	  if [ -d "$$rebase_merge" ] || [ -d "$$rebase_apply" ]; then \
+	    echo "Parent rebase metadata still present; removing stale rebase state"; \
+	    rm -rf "$$rebase_merge" "$$rebase_apply"; \
+	  fi; \
+	fi
 	git pull --rebase origin main
-	git -C certrenew pull origin main
-	git -C port-sync pull origin main
-	git -C rarclean pull origin main
-	git -C rss-curator pull origin main
-	git -C truenas-nginx-config pull origin main
-	git -C truenas-provisioning-image pull origin main
+	@set -e; \
+	for module in certrenew port-sync rarclean rss-curator truenas-nginx-config truenas-provisioning-image; do \
+	  rebase_merge=$$(git -C $$module rev-parse --git-path rebase-merge); \
+	  rebase_apply=$$(git -C $$module rev-parse --git-path rebase-apply); \
+	  if [ -d "$$rebase_merge" ] || [ -d "$$rebase_apply" ]; then \
+	    echo "Detected unfinished rebase in $$module; aborting stale state"; \
+	    git -C $$module rebase --abort || true; \
+	    if [ -d "$$rebase_merge" ] || [ -d "$$rebase_apply" ]; then \
+	      echo "$$module rebase metadata still present; removing stale rebase state"; \
+	      rm -rf "$$rebase_merge" "$$rebase_apply"; \
+	    fi; \
+	  fi; \
+	  git -C $$module pull --rebase origin main; \
+	done
 	git add .gitmodules certrenew port-sync rarclean rss-curator truenas-nginx-config truenas-provisioning-image
 	git -c user.name=$(GIT_USER_NAME) -c user.email=$(GIT_USER_EMAIL) commit -m "chore: advance submodule pins" || true
 
