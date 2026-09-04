@@ -4,9 +4,27 @@
 set -euo pipefail
 
 DOTFILES_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-HOME_DIR="$HOME"
 
-echo "==> Bootstrapping truenas_admin environment from $DOTFILES_DIR"
+# Prefer bootstrapping truenas_admin even when the script is invoked from a root/provisioner context.
+TARGET_USER="${DOTFILES_USER:-${SUDO_USER:-$USER}}"
+if [[ "$TARGET_USER" == "root" ]] && getent passwd truenas_admin >/dev/null 2>&1; then
+  TARGET_USER="truenas_admin"
+fi
+
+HOME_DIR="$(getent passwd "$TARGET_USER" | cut -d: -f6 || true)"
+if [[ -z "$HOME_DIR" ]]; then
+  HOME_DIR="$HOME"
+fi
+
+echo "==> Bootstrapping $TARGET_USER environment from $DOTFILES_DIR"
+
+run_as_root() {
+  if [[ "$(id -u)" -eq 0 ]]; then
+    "$@"
+  else
+    sudo "$@"
+  fi
+}
 
 # --- zsh ---
 ZSH_BIN="$(command -v zsh 2>/dev/null || true)"
@@ -20,10 +38,10 @@ if [[ -z "$ZSH_BIN" ]]; then
 fi
 
 if [[ -n "$ZSH_BIN" ]]; then
-  CURRENT_SHELL=$(getent passwd "$USER" | cut -d: -f7)
+  CURRENT_SHELL=$(getent passwd "$TARGET_USER" | cut -d: -f7)
   if [[ "$CURRENT_SHELL" != "$ZSH_BIN" ]]; then
-    echo "==> Setting zsh as default shell for $USER"
-    sudo chsh -s "$ZSH_BIN" "$USER"
+    echo "==> Setting zsh as default shell for $TARGET_USER"
+    run_as_root chsh -s "$ZSH_BIN" "$TARGET_USER"
   fi
 else
   echo "WARN: zsh not found; skipping default shell update"
@@ -42,9 +60,15 @@ for f in zshrc zprofile ssh/config; do
   mkdir -p "$(dirname "$dst")"
   if [[ -f "$dst" && ! -L "$dst" ]]; then
     echo "  backup: $dst -> ${dst}.bak"
-    mv "$dst" "${dst}.bak"
+    mv "$dst" "${dst}.bak" || {
+      echo "  warn: unable to backup $dst (continuing)"
+      continue
+    }
   fi
-  ln -sf "$src" "$dst"
+  ln -sf "$src" "$dst" || {
+    echo "  warn: unable to link $dst (continuing)"
+    continue
+  }
   echo "  linked: $dst -> $src"
 done
 
@@ -53,14 +77,14 @@ SUDOERS_SRC="$DOTFILES_DIR/sudoers.d/truenas_admin"
 SUDOERS_DST="/etc/sudoers.d/truenas_admin"
 if [[ -f "$SUDOERS_SRC" ]]; then
   echo "==> Installing sudo rules"
-  sudo install -m 0440 "$SUDOERS_SRC" "$SUDOERS_DST"
-  sudo visudo -cf "$SUDOERS_DST" && echo "  sudo rules OK" || echo "  ERROR: invalid sudoers file"
+  run_as_root install -m 0440 "$SUDOERS_SRC" "$SUDOERS_DST"
+  run_as_root visudo -cf "$SUDOERS_DST" && echo "  sudo rules OK" || echo "  ERROR: invalid sudoers file"
 fi
 
 # --- SSH key perms ---
 if [[ -d "$HOME_DIR/.ssh" ]]; then
   echo "==> Fixing .ssh permissions"
-  chmod 700 "$HOME_DIR/.ssh"
+  chmod 700 "$HOME_DIR/.ssh" || true
   chmod 600 "$HOME_DIR/.ssh/"* 2>/dev/null || true
   chmod 644 "$HOME_DIR/.ssh/"*.pub 2>/dev/null || true
 fi
