@@ -42,6 +42,7 @@ alias tree='tree -C'
 
 # ── Aliases — provisioner ────────────────────────────────────────────────────
 alias prov='sudo docker exec -it provisioner bash'
+unalias make >/dev/null 2>&1 || true
 make() {
   if [ "$1" = "dotfiles" ]; then
     bash /mnt/cell_block_d/repos/truenas/dotfiles/bootstrap.sh
