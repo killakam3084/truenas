@@ -43,6 +43,11 @@ alias tree='tree -C'
 # ── Aliases — provisioner ────────────────────────────────────────────────────
 alias prov='sudo docker exec -it provisioner bash'
 make() {
+  if [ "$1" = "dotfiles" ]; then
+    bash /mnt/cell_block_d/repos/truenas/dotfiles/bootstrap.sh
+    return $?
+  fi
+
   if ! sudo docker ps -a --format '{{.Names}}' | grep -q '^provisioner$'; then
     sudo docker compose -f /mnt/cell_block_d/repos/truenas/truenas-provisioning-image/docker-compose.yml up -d provisioner
   elif ! sudo docker ps --format '{{.Names}}' | grep -q '^provisioner$'; then
