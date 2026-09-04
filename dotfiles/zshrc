@@ -29,9 +29,10 @@ autoload -Uz compinit && compinit
 # ── Keybindings ──────────────────────────────────────────────────────────────
 # Enable familiar Ctrl+R/Ctrl+S incremental history search.
 stty -ixon
-bindkey -e
+bindkey -v
 bindkey '^R' history-incremental-search-backward
 bindkey '^S' history-incremental-search-forward
+export KEYTIMEOUT=1
 
 # ── Aliases — general ────────────────────────────────────────────────────────
 alias ll='ls -lahtr'
@@ -41,7 +42,14 @@ alias tree='tree -C'
 
 # ── Aliases — provisioner ────────────────────────────────────────────────────
 alias prov='sudo docker exec -it provisioner bash'
-alias make='sudo docker exec provisioner make -C /mnt/cell_block_d/repos/truenas'
+make() {
+  if ! sudo docker ps -a --format '{{.Names}}' | grep -q '^provisioner$'; then
+    sudo docker compose -f /mnt/cell_block_d/repos/truenas/truenas-provisioning-image/docker-compose.yml up -d provisioner
+  elif ! sudo docker ps --format '{{.Names}}' | grep -q '^provisioner$'; then
+    sudo docker start provisioner
+  fi
+  sudo docker exec provisioner make -C /mnt/cell_block_d/repos/truenas "$@"
+}
 alias tree='sudo docker exec provisioner tree -C'
 
 # ── Aliases — repo shortcuts (run from inside provisioner) ───────────────────
