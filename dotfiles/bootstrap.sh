@@ -9,15 +9,25 @@ HOME_DIR="$HOME"
 echo "==> Bootstrapping truenas_admin environment from $DOTFILES_DIR"
 
 # --- zsh ---
-if ! command -v zsh &>/dev/null; then
-  echo "ERROR: zsh not found. Install it first: sudo apt-get install -y zsh"
-  exit 1
+ZSH_BIN="$(command -v zsh 2>/dev/null || true)"
+if [[ -z "$ZSH_BIN" ]]; then
+  for candidate in /usr/bin/zsh /bin/zsh /usr/local/bin/zsh; do
+    if [[ -x "$candidate" ]]; then
+      ZSH_BIN="$candidate"
+      break
+    fi
+  done
 fi
 
-CURRENT_SHELL=$(getent passwd "$USER" | cut -d: -f7)
-if [[ "$CURRENT_SHELL" != "$(command -v zsh)" ]]; then
-  echo "==> Setting zsh as default shell for $USER"
-  sudo chsh -s "$(command -v zsh)" "$USER"
+if [[ -n "$ZSH_BIN" ]]; then
+  CURRENT_SHELL=$(getent passwd "$USER" | cut -d: -f7)
+  if [[ "$CURRENT_SHELL" != "$ZSH_BIN" ]]; then
+    echo "==> Setting zsh as default shell for $USER"
+    sudo chsh -s "$ZSH_BIN" "$USER"
+  fi
+else
+  echo "WARN: zsh not found; skipping default shell update"
+  echo "      Install with: sudo apt-get install -y zsh"
 fi
 
 # --- symlink dotfiles ---
@@ -55,4 +65,8 @@ if [[ -d "$HOME_DIR/.ssh" ]]; then
   chmod 644 "$HOME_DIR/.ssh/"*.pub 2>/dev/null || true
 fi
 
-echo "==> Done. Start a new zsh session: exec zsh"
+if [[ -n "$ZSH_BIN" ]]; then
+  echo "==> Done. Start a new zsh session: exec zsh"
+else
+  echo "==> Done. Dotfiles linked, but zsh is not installed"
+fi
