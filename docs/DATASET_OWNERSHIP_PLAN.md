@@ -31,6 +31,51 @@ Interpretation:
 - Keep repo, automation, and provisioning paths owned by truenas_admin:950:950.
 - Treat shared media datasets as a governed boundary using ACLs and least privilege.
 
+## TrueNAS Permissions Primer
+
+TrueNAS permission behavior can feel overlapping because there are multiple layers.
+Use this order of operations when reasoning about access:
+
+1. Container runtime identity
+- Which uid:gid does the app run as (for example 568:568 or root:root)?
+- Supplementary groups (for example apps) expand effective access.
+
+2. Dataset ownership and mode bits
+- Owner, group, and unix mode still matter, especially on datasets using unix permissions.
+- Ownership alone is not enough if ACL entries are more permissive or restrictive.
+
+3. ACL model
+- For datasets using NFSv4 ACL, explicit ACL entries are the main control plane.
+- Inheritance flags on parent directories can silently grant permissions to new files.
+
+4. App-managed permission helpers
+- Some TrueNAS apps run a short-lived permissions container as root.
+- That helper may chown/chmod configured paths back to uid/gid 568 on startup.
+
+5. Mount scope
+- The broadest practical risk factor is the mount path itself.
+- A narrow ACL on a very broad mount still exposes a large filesystem surface.
+
+### Practical Rules for This Repo
+
+1. Prefer ACL-driven policy over repeated recursive chown on shared media.
+2. Keep app state under app-specific paths (usually under /mnt/.ix-apps/app_mounts or app-specific data paths).
+3. Limit media RW to manager apps only on paths where mutation is required.
+4. Keep monitoring/network apps out of media write policy.
+5. Treat root-running app containers as high-impact and constrain their mount scope first.
+
+### How To Decide When Something Is "Wrong"
+
+Use this checklist before changing permissions:
+
+1. Does app uid:gid match expected runtime context from app config?
+2. Does the app mount only the paths it truly needs?
+3. Does ACL grant exactly intended rw/ro behavior for that app role?
+4. Is there inheritance causing broader access than intended?
+5. Is a permissions helper reverting changes on container restart?
+
+If all five checks pass, do not change owner/group just for cosmetic consistency.
+
 ## Shared Dataset Strategy
 
 Use one of these patterns per dataset:
