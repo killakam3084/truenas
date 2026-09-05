@@ -80,6 +80,35 @@ Ownership implication:
 - Avoid granting broad write at /mnt/cell_block_d/media root unless intentionally accepting Plex-managed writes across the full tree.
 - Prefer splitting writable managed zones under media and scoping Plex RW there.
 
+## Verified Filebrowser Mount Facts
+
+From sampled filebrowser user_config.yaml versions:
+
+- Filebrowser state path:
+  - /mnt/.ix-apps/app_mounts/filebrowser/config
+- Host path mount consistently configured as:
+  - path: /mnt/cell_block_d
+  - mount_path: .
+
+Observed in versions including:
+
+- 1.2.12
+- 1.3.22
+- 1.3.24
+- 1.3.25
+- 1.3.26
+- 1.3.27
+- 1.3.29
+- 1.3.34
+- 1.3.36
+- 1.3.38
+- 1.3.40
+
+Ownership implication:
+
+- Filebrowser is effectively mounted at the top of cell_block_d, so any RW grant here has very large blast radius.
+- For least-privilege alignment, replace this with scoped subpath mounts where possible (for example media-only managed paths instead of whole dataset root).
+
 ## Verified TrueNAS App Runtime Context
 
 | App | Runtime User/Group | Supplementary Groups | Notable Capability/Behavior | Ownership Impact |
@@ -122,11 +151,32 @@ Use content-based discovery instead:
 grep -RinE 'hostPath|mountPath|app_mounts|/mnt/cell_block_d|/mnt/.ix-apps' /mnt/.ix-apps/app_configs
 ```
 
-To reduce noise, restrict to user and rendered config files first:
+To reduce noise, query only the latest installed version per app:
 
 ```sh
-find /mnt/.ix-apps/app_configs -type f \( -name 'user_config.yaml' -o -path '*/templates/rendered/docker-compose.yaml' \) -print
-grep -RinE 'app_mounts|/mnt/cell_block_d|mount_path|"user"|"group_add"' /mnt/.ix-apps/app_configs/*/versions/*/user_config.yaml /mnt/.ix-apps/app_configs/*/versions/*/templates/rendered/docker-compose.yaml
+for app in /mnt/.ix-apps/app_configs/*; do
+  [ -d "$app/versions" ] || continue
+  latest=$(find "$app/versions" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort -V | tail -n 1)
+  [ -n "$latest" ] || continue
+  echo "===== $(basename "$app") @ $latest ====="
+  cfg="$app/versions/$latest/user_config.yaml"
+  rdc="$app/versions/$latest/templates/rendered/docker-compose.yaml"
+  [ -f "$cfg" ] && grep -nE 'app_mounts|/mnt/cell_block_d|mount_path|path:' "$cfg"
+  [ -f "$rdc" ] && grep -nE '"source"\s*:\s*"/mnt/.ix-apps/app_mounts|"source"\s*:\s*"/mnt/cell_block_d|"user"\s*:\s*|"group_add"\s*:\s*' "$rdc"
+done
+```
+
+If your shell lacks `find -printf`, use this portable fallback:
+
+```sh
+for app in /mnt/.ix-apps/app_configs/*; do
+  [ -d "$app/versions" ] || continue
+  latest=$(ls -1 "$app/versions" | sort -V | tail -n 1)
+  [ -n "$latest" ] || continue
+  echo "===== $(basename "$app") @ $latest ====="
+  cfg="$app/versions/$latest/user_config.yaml"
+  [ -f "$cfg" ] && grep -nE 'app_mounts|/mnt/cell_block_d|mount_path|path:' "$cfg"
+done
 ```
 
 Then enumerate concrete mount directories already created:
@@ -156,7 +206,7 @@ And from each app container context, verify effective access only in intended zo
 
 - Confirm exact dataset path for prometheus state under /mnt/.ix-apps/app_mounts or app chart values.
 - Confirm exact dataset path for grafana state under /mnt/.ix-apps/app_mounts or app chart values.
-- Confirm exact dataset path for filebrowser state and replacement migration target (current app marked deprecated).
+- Filebrowser replacement migration target: choose supported app and map equivalent scoped mounts before cutover.
 - Map each official app release name in /mnt/.ix-apps/app_configs to the corresponding directory in /mnt/.ix-apps/app_mounts.
 - Confirm whether Plex writes metadata/sidecars into /mnt/cell_block_d/media or keeps metadata fully under /config.
 - Decide if `media/video` should be further split into `managed` and `archive` subpaths.
