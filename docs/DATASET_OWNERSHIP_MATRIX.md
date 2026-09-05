@@ -111,7 +111,7 @@ Ownership implication:
 Verification status from latest extraction run:
 
 - Verified: filebrowser, grafana, netdata, plex, prometheus, tailscale
-- Pending deeper mapping: qbittorrent and gluetun-vpn (present in app_mounts tree; validate current app_configs linkage)
+- Legacy/cleanup: qbittorrent and gluetun-vpn (present in /mnt/.ix-apps/app_mounts but now managed via custom repo infrastructure; safe to remove after final validation)
 
 ## Sensitive Output Handling
 
@@ -243,7 +243,14 @@ And from each app container context, verify effective access only in intended zo
 ## Open Items
 
 - Filebrowser replacement migration target: choose supported app and map equivalent scoped mounts before cutover.
-- Map qbittorrent and gluetun-vpn app_configs to their current app_mounts paths (or confirm if those mounts are legacy/unmanaged).
 - Confirm whether Plex writes metadata/sidecars into /mnt/cell_block_d/media or keeps metadata fully under /config.
 - Decide if `media/video` should be further split into `managed` and `archive` subpaths.
 - Replace deprecated filebrowser app with supported alternative before finalizing long-term acl baselines.
+
+## Cleanup Opportunities
+
+Before remediation phase:
+
+- Validate that qbittorrent and gluetun-vpn app_mounts directories are truly orphaned (no active TrueNAS app references).
+- If confirmed orphaned, remove /mnt/.ix-apps/app_mounts/qbittorrent and /mnt/.ix-apps/app_mounts/gluetun-vpn to reduce ownership surface.
+- This shrinks the blast radius and clarifies that all remaining TrueNAS managed app mounts are actively reconciled.
