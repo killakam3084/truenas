@@ -142,6 +142,14 @@ sed -E 's/(TS_AUTHKEY"\s*:\s*")[^"]+("?)/\1REDACTED\2/g; s/(password"\s*:\s*")[^
 - apps uid/gid 568 is validated for filebrowser, grafana, and prometheus runtime contexts.
 - Monitoring and network utility apps (netdata, tailscale) should remain out of shared-media rw policy.
 
+## Formal Classification Rule (Mutation-Based)
+
+- Classification is based on mutation behavior, not on content age.
+- If an app must rename, move, delete, or write metadata/sidecars in a path, that path is classified as managed (RW for that app).
+- If a path is truly static and never needs app mutations, that path is classified as immutable (RO for apps).
+- In this environment, Plex, Roon, and file-management apps are manager-class tools and may require RW on canonical library paths.
+- Least-privilege objective: grant RW only to designated manager apps on required paths, keep all non-manager consumers RO, and rely on snapshots for rollback safety.
+
 ## Verification Checklist Per Row
 
 - Confirm path exists: `test -d <path>`
