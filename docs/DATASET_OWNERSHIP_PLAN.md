@@ -2,6 +2,29 @@
 
 Purpose: define a stable ownership model for shared media datasets across custom stacks and TrueNAS community apps.
 
+## Observed Baseline (2026-09-05)
+
+From current TrueNAS UI snapshots:
+
+- Dataset cell_block_d
+  - Owner: root:root
+  - Permissions style: Unix permissions
+  - Marked as used by: prometheus and system dataset
+
+- Dataset media
+  - Owner: truenas_admin:truenas_admin
+  - Marked as used by: plex, filebrowser
+  - ACL model: NFSv4-style entries shown in UI
+
+- Datasets media/audio and media/video
+  - Owner: truenas_admin:truenas_admin
+  - ACL entries include apps group/user RW-level access in current state
+
+Interpretation:
+
+- This is already a mixed ownership model (root for top-level system dataset, truenas_admin for media datasets).
+- Community apps appear to be granted broad write ability on media via ACL, which can work, but should be narrowed to managed paths where possible.
+
 ## Core Model
 
 - Keep TrueNAS community app state owned by apps:568:568.
@@ -114,6 +137,29 @@ getfacl -p /mnt/cell_block_d/apps
 5. Drift Prevention
 - Add quarterly audit command run and compare against matrix.
 - Add a lightweight Make target or script to print owners/ACLs for key paths.
+
+## Immediate Course of Action (Shared Media Focus)
+
+1. Freeze top-level ownership boundaries
+- Keep cell_block_d as root-owned system boundary.
+- Keep media as truenas_admin-owned unless a strong operational reason requires change.
+
+2. Split media into intent-based paths
+- Immutable library paths: read-only for apps that only index/stream.
+- Managed library paths: RW only for apps that must organize or mutate files (for example Plex or Filebrowser in manager mode).
+
+3. Reduce broad RW ACL exposure
+- Replace global RW grants on broad media roots with scoped RW on specific managed subpaths.
+- Keep explicit default ACL inheritance only where new files must remain app-manageable.
+
+4. Separate app state from media data
+- Keep app internals/config/state under apps-owned datasets.
+- Use media datasets for content only, with explicit consumer ACLs.
+
+5. Validate by runtime role
+- truenas_admin host shell: full expected operations on media.
+- provisioner truenas_admin context: git/make flows unaffected.
+- apps runtime (Plex/Filebrowser): verify only intended write zones are writable.
 
 ## Guardrails
 
