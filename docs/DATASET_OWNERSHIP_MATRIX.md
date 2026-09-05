@@ -82,32 +82,30 @@ Ownership implication:
 
 ## Verified Filebrowser Mount Facts
 
-From sampled filebrowser user_config.yaml versions:
+From latest sampled filebrowser config (1.4.28):
 
 - Filebrowser state path:
   - /mnt/.ix-apps/app_mounts/filebrowser/config
-- Host path mount consistently configured as:
-  - path: /mnt/cell_block_d
-  - mount_path: .
-
-Observed in versions including:
-
-- 1.2.12
-- 1.3.22
-- 1.3.24
-- 1.3.25
-- 1.3.26
-- 1.3.27
-- 1.3.29
-- 1.3.34
-- 1.3.36
-- 1.3.38
-- 1.3.40
+- Host path mount:
+  - path: /mnt/cell_block_d/media
+  - mount_path: /media
+  - rendered bind: /mnt/cell_block_d/media -> /data/media (read_write)
 
 Ownership implication:
 
-- Filebrowser is effectively mounted at the top of cell_block_d, so any RW grant here has very large blast radius.
-- For least-privilege alignment, replace this with scoped subpath mounts where possible (for example media-only managed paths instead of whole dataset root).
+- Current mount scope is improved versus older versions because it is media-root scoped instead of full cell_block_d root.
+- Continue least-privilege hardening by splitting writable managed zones under media and keeping immutable paths read-only where feasible.
+
+## Verified App Mapping (Latest Sampled Versions)
+
+| App | Version | State Mount(s) | Host Content Mount(s) | Runtime User |
+|---|---|---|---|---|
+| filebrowser | 1.4.28 | /mnt/.ix-apps/app_mounts/filebrowser/config | /mnt/cell_block_d/media -> /data/media (rw) | 568:568 |
+| grafana | 1.4.17 | /mnt/.ix-apps/app_mounts/grafana/data, /mnt/.ix-apps/app_mounts/grafana/plugins | none | 568:568 |
+| netdata | 1.4.13 | /mnt/.ix-apps/app_mounts/netdata/config, /mnt/.ix-apps/app_mounts/netdata/cache, /mnt/.ix-apps/app_mounts/netdata/lib | host telemetry mounts, no shared media mount | unknown + groups apps,docker |
+| plex | 1.3.13 | /mnt/.ix-apps/app_mounts/plex/config, /mnt/.ix-apps/app_mounts/plex/data | /mnt/cell_block_d/media -> /mnt/cell_block_d/media (rw) | root:root |
+| prometheus | 1.4.16 | /mnt/cell_block_d/prometheus/prometheus-config, /mnt/cell_block_d/prometheus/prometheus-data | none | 568:568 |
+| tailscale | 1.4.14 | /mnt/.ix-apps/app_mounts/tailscale/state | none | unknown (permissions helper root:root) |
 
 ## Verified TrueNAS App Runtime Context
 
@@ -204,10 +202,7 @@ And from each app container context, verify effective access only in intended zo
 
 ## Open Items
 
-- Confirm exact dataset path for prometheus state under /mnt/.ix-apps/app_mounts or app chart values.
-- Confirm exact dataset path for grafana state under /mnt/.ix-apps/app_mounts or app chart values.
 - Filebrowser replacement migration target: choose supported app and map equivalent scoped mounts before cutover.
-- Map each official app release name in /mnt/.ix-apps/app_configs to the corresponding directory in /mnt/.ix-apps/app_mounts.
 - Confirm whether Plex writes metadata/sidecars into /mnt/cell_block_d/media or keeps metadata fully under /config.
 - Decide if `media/video` should be further split into `managed` and `archive` subpaths.
 - Replace deprecated filebrowser app with supported alternative before finalizing long-term acl baselines.
