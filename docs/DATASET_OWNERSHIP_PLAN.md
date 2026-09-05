@@ -170,4 +170,4 @@ getfacl -p /mnt/cell_block_d/apps
 
 ## Next Step
 
-Create a repo-local file docs/DATASET_OWNERSHIP_MATRIX.md and fill real paths for all active services before applying ACL changes.
+Use [docs/DATASET_OWNERSHIP_MATRIX.md](DATASET_OWNERSHIP_MATRIX.md) to track real paths for all active services before applying ACL changes.
