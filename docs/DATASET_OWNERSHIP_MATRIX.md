@@ -3,6 +3,7 @@
 Status: first-pass derived from current dataset tree and repo deployment layout.
 
 Updated with verified TrueNAS app runtime details from UI snapshots on 2026-09-05.
+Updated with verified host mount roots from CLI on 2026-09-05.
 
 ## Legend
 
@@ -27,6 +28,57 @@ Updated with verified TrueNAS app runtime details from UI snapshots on 2026-09-0
 | /mnt/cell_block_d/apps/plex | app-state | plex app | truenas_admin ops | Yes (state only) | apps rw for app internals; avoid coupling with /media root rw | Path may differ by chart; verify in TrueNAS app config |
 | /mnt/cell_block_d/apps/filebrowser | app-state | filebrowser app | truenas_admin ops | Yes (state only) | apps rw for app internals | Path may differ by chart; verify in TrueNAS app config |
 | /mnt/cell_block_d/apps/prometheus | app-state | prometheus app | truenas_admin ops | Yes (state only) | apps rw for app internals | Confirm actual volume path from app chart |
+
+## Verified TrueNAS Host Mount Roots
+
+| Path | Purpose | Owner | Notes |
+|---|---|---|---|
+| /mnt/.ix-apps/app_mounts | Effective host bind-mount roots for installed apps | root:root | Verified from host shell listing |
+| /mnt/.ix-apps/app_configs | App chart/config material | root:root | Useful to verify mount definitions and access mode |
+| /mnt/.ix-apps/backups | App backup artifacts | root:root | Not part of shared media acl policy |
+| /mnt/.ix-apps/docker | Runtime docker data area | root:root | Keep out of media ownership remediation |
+
+Verified app mount directories currently present under /mnt/.ix-apps/app_mounts:
+
+- plex
+- qbittorrent
+- tailscale
+- filebrowser
+- netdata
+- gluetun-vpn
+- grafana
+
+Verified subpaths from host `find` output:
+
+- /mnt/.ix-apps/app_mounts/plex/config
+- /mnt/.ix-apps/app_mounts/plex/data
+- /mnt/.ix-apps/app_mounts/netdata/cache
+- /mnt/.ix-apps/app_mounts/netdata/lib
+- /mnt/.ix-apps/app_mounts/netdata/config
+- /mnt/.ix-apps/app_mounts/gluetun-vpn/storage_entry
+- /mnt/.ix-apps/app_mounts/tailscale/state
+- /mnt/.ix-apps/app_mounts/filebrowser/config
+- /mnt/.ix-apps/app_mounts/grafana/plugins
+- /mnt/.ix-apps/app_mounts/grafana/data
+- /mnt/.ix-apps/app_mounts/qbittorrent/config
+- /mnt/.ix-apps/app_mounts/qbittorrent/downloads
+
+## Verified Plex Mount and Permission Facts
+
+From sampled app config/rendered compose snippets:
+
+- Plex host state mounts:
+  - /mnt/.ix-apps/app_mounts/plex/config -> /config
+  - /mnt/.ix-apps/app_mounts/plex/data -> /data
+- Plex media host bind:
+  - /mnt/cell_block_d/media -> /mnt/cell_block_d/media (read_write)
+- Plex and permissions helper run as user 0:0 with apps supplementary group.
+- Permission helper targets uid/gid 568 for selected mounted paths and may correct ownership on check mode.
+
+Ownership implication:
+
+- Avoid granting broad write at /mnt/cell_block_d/media root unless intentionally accepting Plex-managed writes across the full tree.
+- Prefer splitting writable managed zones under media and scoping Plex RW there.
 
 ## Verified TrueNAS App Runtime Context
 
@@ -53,6 +105,45 @@ Updated with verified TrueNAS app runtime details from UI snapshots on 2026-09-0
 - Confirm consuming app mount mode (ro/rw) in app config or compose
 - Run app-specific read/write probe in intended writable paths only
 
+## Verification Checklist for TrueNAS Managed Apps
+
+Run these commands on host to pin exact path mappings and mount modes:
+
+```sh
+ls -lahtr /mnt/.ix-apps/app_mounts
+ls -lahtr /mnt/.ix-apps/app_configs
+```
+
+Note: filename-based search in /mnt/.ix-apps/app_configs may return nothing because app names are often nested under release/version directories.
+
+Use content-based discovery instead:
+
+```sh
+grep -RinE 'hostPath|mountPath|app_mounts|/mnt/cell_block_d|/mnt/.ix-apps' /mnt/.ix-apps/app_configs
+```
+
+To reduce noise, restrict to user and rendered config files first:
+
+```sh
+find /mnt/.ix-apps/app_configs -type f \( -name 'user_config.yaml' -o -path '*/templates/rendered/docker-compose.yaml' \) -print
+grep -RinE 'app_mounts|/mnt/cell_block_d|mount_path|"user"|"group_add"' /mnt/.ix-apps/app_configs/*/versions/*/user_config.yaml /mnt/.ix-apps/app_configs/*/versions/*/templates/rendered/docker-compose.yaml
+```
+
+Then enumerate concrete mount directories already created:
+
+```sh
+find /mnt/.ix-apps/app_mounts -mindepth 1 -maxdepth 2 -type d -print
+```
+
+Then, for each verified mount path:
+
+```sh
+stat -c '%n %U:%G %a' <path>
+getfacl -p <path>
+```
+
+And from each app container context, verify effective access only in intended zones.
+
 ## Remediation Order
 
 1. Lock system boundary (`/mnt/cell_block_d`) unchanged.
@@ -63,7 +154,10 @@ Updated with verified TrueNAS app runtime details from UI snapshots on 2026-09-0
 
 ## Open Items
 
-- Confirm actual app dataset mount paths for plex, filebrowser, prometheus in TrueNAS app settings.
-- Confirm whether Plex metadata writes occur inside library path or only app state path.
+- Confirm exact dataset path for prometheus state under /mnt/.ix-apps/app_mounts or app chart values.
+- Confirm exact dataset path for grafana state under /mnt/.ix-apps/app_mounts or app chart values.
+- Confirm exact dataset path for filebrowser state and replacement migration target (current app marked deprecated).
+- Map each official app release name in /mnt/.ix-apps/app_configs to the corresponding directory in /mnt/.ix-apps/app_mounts.
+- Confirm whether Plex writes metadata/sidecars into /mnt/cell_block_d/media or keeps metadata fully under /config.
 - Decide if `media/video` should be further split into `managed` and `archive` subpaths.
 - Replace deprecated filebrowser app with supported alternative before finalizing long-term acl baselines.
