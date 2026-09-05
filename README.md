@@ -2,6 +2,10 @@
 
 Monorepo (git submodule pattern) for all TrueNAS SCALE configuration, custom app definitions, and provisioning tooling.
 
+## Stability Checkpoint
+
+For the known-good host/provisioner convergence workflow, see [docs/STABILITY_CHECKPOINT.md](docs/STABILITY_CHECKPOINT.md).
+
 ## Submodules
 
 | Submodule | Purpose |
@@ -107,7 +111,7 @@ No container restart needed — qBittorrent serves the theme directory as static
 
 The `truenas-provisioning-image` container runs as a TrueNAS custom app. On startup it clones/pulls
 this monorepo to `/mnt/cell_block_d/repos/truenas` and keeps a shell available for ad-hoc tasks.
-It mounts `/var/run/docker.sock` for docker/compose CLI access and `/root/.ssh` for git auth.
+It mounts `/var/run/docker.sock` for docker/compose CLI access and `/home/truenas_admin/.ssh` for git auth.
 
 ```sh
 # Enter provisioner shell
