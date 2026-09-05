@@ -163,7 +163,11 @@ logging-down:
 
 ## Apply dotfiles for truenas_admin (run as truenas_admin on host, not inside provisioner)
 dotfiles:
-	DOTFILES_USER=truenas_admin bash $(REPO_DIR)dotfiles/bootstrap.sh
+	@if [ "$(shell id -un)" = "truenas_admin" ]; then \
+	  DOTFILES_USER=truenas_admin bash $(REPO_DIR)dotfiles/bootstrap.sh; \
+	else \
+	  sudo -u truenas_admin -H DOTFILES_USER=truenas_admin bash $(REPO_DIR)dotfiles/bootstrap.sh; \
+	fi
 
 ## Show available targets
 help:

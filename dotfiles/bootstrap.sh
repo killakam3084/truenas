@@ -11,7 +11,26 @@ if [[ "$TARGET_USER" == "root" ]] && getent passwd truenas_admin >/dev/null 2>&1
   TARGET_USER="truenas_admin"
 fi
 
-HOME_DIR="$(getent passwd "$TARGET_USER" | cut -d: -f6 || true)"
+resolve_home_dir() {
+  local user="$1"
+  local home=""
+
+  if command -v getent >/dev/null 2>&1; then
+    home="$(getent passwd "$user" | cut -d: -f6 || true)"
+  fi
+
+  if [[ -z "$home" ]] && [[ -r /etc/passwd ]]; then
+    home="$(awk -F: -v u="$user" '$1==u {print $6; exit}' /etc/passwd)"
+  fi
+
+  if [[ -z "$home" ]]; then
+    home="$(eval echo "~$user" 2>/dev/null || true)"
+  fi
+
+  echo "$home"
+}
+
+HOME_DIR="$(resolve_home_dir "$TARGET_USER")"
 if [[ -z "$HOME_DIR" ]]; then
   HOME_DIR="$HOME"
 fi
@@ -77,8 +96,12 @@ SUDOERS_SRC="$DOTFILES_DIR/sudoers.d/truenas_admin"
 SUDOERS_DST="/etc/sudoers.d/truenas_admin"
 if [[ -f "$SUDOERS_SRC" ]]; then
   echo "==> Installing sudo rules"
-  run_as_root install -m 0440 "$SUDOERS_SRC" "$SUDOERS_DST"
-  run_as_root visudo -cf "$SUDOERS_DST" && echo "  sudo rules OK" || echo "  ERROR: invalid sudoers file"
+  if run_as_root mkdir -p "$(dirname "$SUDOERS_DST")" \
+    && run_as_root install -m 0440 "$SUDOERS_SRC" "$SUDOERS_DST"; then
+    run_as_root visudo -cf "$SUDOERS_DST" && echo "  sudo rules OK" || echo "  ERROR: invalid sudoers file"
+  else
+    echo "  warn: unable to install sudoers file to $SUDOERS_DST (continuing)"
+  fi
 fi
 
 # --- SSH key perms ---
