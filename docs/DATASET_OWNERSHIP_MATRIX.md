@@ -4,6 +4,7 @@ Status: first-pass derived from current dataset tree and repo deployment layout.
 
 Updated with verified TrueNAS app runtime details from UI snapshots on 2026-09-05.
 Updated with verified host mount roots from CLI on 2026-09-05.
+Updated with full latest-version extraction output on 2026-09-05.
 
 ## Legend
 
@@ -107,6 +108,23 @@ Ownership implication:
 | prometheus | 1.4.16 | /mnt/cell_block_d/prometheus/prometheus-config, /mnt/cell_block_d/prometheus/prometheus-data | none | 568:568 |
 | tailscale | 1.4.14 | /mnt/.ix-apps/app_mounts/tailscale/state | none | unknown (permissions helper root:root) |
 
+Verification status from latest extraction run:
+
+- Verified: filebrowser, grafana, netdata, plex, prometheus, tailscale
+- Pending deeper mapping: qbittorrent and gluetun-vpn (present in app_mounts tree; validate current app_configs linkage)
+
+## Sensitive Output Handling
+
+- Command output from rendered app configs may include credentials or auth tokens.
+- Before sharing logs, redact obvious secret fields (for example TS_AUTHKEY, passwords, tokens, private keys).
+- If a live auth key is exposed, rotate it immediately in the upstream service.
+
+Redaction helper example:
+
+```sh
+sed -E 's/(TS_AUTHKEY"\s*:\s*")[^"]+("?)/\1REDACTED\2/g; s/(password"\s*:\s*")[^"]+("?)/\1REDACTED\2/g; s/(token"\s*:\s*")[^"]+("?)/\1REDACTED\2/g'
+```
+
 ## Verified TrueNAS App Runtime Context
 
 | App | Runtime User/Group | Supplementary Groups | Notable Capability/Behavior | Ownership Impact |
@@ -177,6 +195,28 @@ for app in /mnt/.ix-apps/app_configs/*; do
 done
 ```
 
+For a compact, copy/paste-friendly summary across all apps, use:
+
+```sh
+for app in /mnt/.ix-apps/app_configs/*; do
+  [ -d "$app/versions" ] || continue
+  latest=$(ls -1 "$app/versions" | sort -V | tail -n 1)
+  [ -n "$latest" ] || continue
+  cfg="$app/versions/$latest/user_config.yaml"
+  rdc="$app/versions/$latest/templates/rendered/docker-compose.yaml"
+  echo "===== $(basename "$app") @ $latest ====="
+  [ -f "$cfg" ] && grep -nE '"config"\s*:|"data"\s*:|"plugins"\s*:|"state"\s*:|path: /mnt/|mount_path:' "$cfg"
+  [ -f "$rdc" ] && grep -nE '"source"\s*:\s*"/mnt/|"target"\s*:\s*"/|"user"\s*:\s*|"group_add"\s*:\s*' "$rdc"
+  echo
+done
+```
+
+Optional: write output to a file for easier sharing:
+
+```sh
+sudo bash -c '<PASTE THE LOOP ABOVE>' > /tmp/truenas-app-mount-facts.txt
+```
+
 Then enumerate concrete mount directories already created:
 
 ```sh
@@ -203,6 +243,7 @@ And from each app container context, verify effective access only in intended zo
 ## Open Items
 
 - Filebrowser replacement migration target: choose supported app and map equivalent scoped mounts before cutover.
+- Map qbittorrent and gluetun-vpn app_configs to their current app_mounts paths (or confirm if those mounts are legacy/unmanaged).
 - Confirm whether Plex writes metadata/sidecars into /mnt/cell_block_d/media or keeps metadata fully under /config.
 - Decide if `media/video` should be further split into `managed` and `archive` subpaths.
 - Replace deprecated filebrowser app with supported alternative before finalizing long-term acl baselines.
