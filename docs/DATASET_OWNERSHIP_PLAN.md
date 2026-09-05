@@ -171,3 +171,111 @@ getfacl -p /mnt/cell_block_d/apps
 ## Next Step
 
 Use [docs/DATASET_OWNERSHIP_MATRIX.md](DATASET_OWNERSHIP_MATRIX.md) to track real paths for all active services before applying ACL changes.
+
+## Step-by-Step Action Plan
+
+Use this sequence in the next working session.
+
+### Phase 0: Pre-Flight Safety
+
+1. Confirm clean repo state and latest docs.
+2. Rotate any previously exposed secrets (for example Tailscale auth key) before further output sharing.
+3. Capture a fresh snapshot or backup checkpoint for media datasets before permission edits.
+
+Success criteria:
+
+- Snapshot exists for rollback.
+- No active secret exposure in shared logs.
+
+### Phase 1: Confirm Active vs Legacy App Mounts
+
+1. Validate qbittorrent and gluetun-vpn app mounts are orphaned from TrueNAS managed apps.
+2. If orphaned, remove those app_mounts directories.
+3. Re-run mount inventory to confirm only active managed-app mounts remain.
+
+Success criteria:
+
+- Active managed-app mount list excludes legacy qbittorrent/gluetun-vpn cruft.
+
+Rollback point:
+
+- Restore removed directories from snapshot if active dependency is discovered.
+
+### Phase 2: Classify Media Paths by Mutation Need
+
+1. Apply mutation-based rule from matrix notes:
+  - if app must rename/move/delete/write metadata, classify path as managed.
+  - if app never mutates data, classify path as immutable.
+2. For current reality, assume Plex and file-management app paths are managed unless proven otherwise.
+3. Mark tentative classifications directly in the ownership matrix.
+
+Success criteria:
+
+- Every media path used by apps has explicit managed or immutable classification.
+
+### Phase 3: Define Target ACL Intent Per Path
+
+1. For each managed path:
+  - RW for manager apps (Plex and current file manager)
+  - RO for non-manager consumers
+2. For each immutable path:
+  - RO for all app consumers
+  - RW only for approved ingest/ops flows
+3. Keep app state mounts under apps-owned app_mounts paths.
+
+Success criteria:
+
+- Matrix row for each path includes concrete writer set and reader set.
+
+### Phase 4: Pilot on Smallest Managed Path
+
+1. Select a low-risk pilot path (for example one video managed subpath).
+2. Apply ACL changes only to pilot path.
+3. Validate:
+  - Plex write actions still work where expected.
+  - RO paths reject unintended writes.
+  - Roon and other readers can still index/stream.
+
+Success criteria:
+
+- Functional app behavior unchanged where intended.
+- No unintended write capability outside pilot scope.
+
+Rollback point:
+
+- Revert pilot path ACL using snapshot or recorded previous ACL.
+
+### Phase 5: Expand Incrementally
+
+1. Roll out ACL policy path-by-path from pilot to remaining managed paths.
+2. Re-test after each expansion step.
+3. Keep change log notes in matrix for what changed and when.
+
+Success criteria:
+
+- All target paths match intended ACL policy.
+- No app regressions.
+
+### Phase 6: Finalize and Harden
+
+1. Replace deprecated Filebrowser with supported successor.
+2. Re-map successor mounts and update matrix rows.
+3. Add recurring permission audit task (quarterly) using verification checklist commands.
+
+Success criteria:
+
+- Deprecated app removed from active policy surface.
+- Matrix reflects only active apps and current mounts.
+
+## Quick Start Commands (Session Opening)
+
+```sh
+cd /mnt/cell_block_d/repos/truenas
+git pull origin main
+
+# verify current mounts
+sudo find /mnt/.ix-apps/app_mounts -mindepth 1 -maxdepth 2 -type d -print
+
+# run latest-version mapping extractor from matrix notes
+# (copy from docs/DATASET_OWNERSHIP_MATRIX.md)
+```
