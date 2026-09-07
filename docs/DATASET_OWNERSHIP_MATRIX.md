@@ -116,6 +116,18 @@ Verification status from latest extraction run:
 
 The active custom stack does not use the legacy `/mnt/.ix-apps/app_mounts` directories. The similarly named running containers must not be mistaken for TrueNAS-managed app references.
 
+Live Docker inspection confirmed these active mounts:
+
+- qbittorrent:
+  - /mnt/cell_block_d/media -> /mnt/cell_block_d/media
+  - /mnt/cell_block_d/apps/qbittorrent-vpn/config -> /config
+  - /mnt/cell_block_d/apps/qbittorrent-vpn/downloads -> /downloads
+- gluetun:
+  - /mnt/cell_block_d/apps/qbittorrent-vpn/gluetun -> /gluetun
+  - /mnt/cell_block_d/apps/qbittorrent-vpn/gluetun-port -> /tmp/gluetun
+
+No `/mnt/.ix-apps/app_mounts/qbittorrent` or `/mnt/.ix-apps/app_mounts/gluetun-vpn` mount appears in either container.
+
 ## Sensitive Output Handling
 
 - Command output from rendered app configs may include credentials or auth tokens.
