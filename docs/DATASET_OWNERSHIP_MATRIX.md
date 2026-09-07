@@ -116,6 +116,15 @@ Verification status from latest extraction run:
 
 The active custom stack does not use the legacy `/mnt/.ix-apps/app_mounts` directories. The similarly named running containers must not be mistaken for TrueNAS-managed app references.
 
+The legacy paths are ZFS dataset mountpoints, not ordinary directories:
+
+- `cell_block_d/ix-apps/app_mounts/qbittorrent`
+  - child datasets: `config`, `downloads`
+- `cell_block_d/ix-apps/app_mounts/gluetun-vpn`
+  - child dataset: `storage_entry`
+
+Therefore they must be removed through TrueNAS dataset controls or `zfs destroy` after inventory and backup review. They cannot be quarantined with `mv`.
+
 Live Docker inspection confirmed these active mounts:
 
 - qbittorrent:
@@ -276,6 +285,6 @@ Before remediation phase:
 
 - Confirm no TrueNAS app config references remain for the legacy paths.
 - Confirm the active custom stack uses `/mnt/cell_block_d/apps/qbittorrent-vpn/` and is healthy.
-- Preserve a snapshot or archive of the legacy directories before removal because they contain historical config/data (`qBittorrent`, `servers.json`, and port-forward state).
-- If confirmed orphaned and backed up, remove `/mnt/.ix-apps/app_mounts/qbittorrent` and `/mnt/.ix-apps/app_mounts/gluetun-vpn`.
+- Preserve a snapshot or archive of the legacy datasets before removal because they contain historical config/data (`qBittorrent`, `servers.json`, and port-forward state).
+- If confirmed orphaned and backed up, destroy the dataset hierarchies through TrueNAS or ZFS.
 - This shrinks the blast radius and clarifies that all remaining TrueNAS managed app mounts are actively reconciled.
