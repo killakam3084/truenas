@@ -111,7 +111,10 @@ Ownership implication:
 Verification status from latest extraction run:
 
 - Verified: filebrowser, grafana, netdata, plex, prometheus, tailscale
-- Legacy/cleanup: qbittorrent and gluetun-vpn (present in /mnt/.ix-apps/app_mounts but now managed via custom repo infrastructure; safe to remove after final validation)
+- Legacy/cleanup candidates: /mnt/.ix-apps/app_mounts/qbittorrent and /mnt/.ix-apps/app_mounts/gluetun-vpn
+- Active custom replacements: container names qbittorrent and gluetun, using /mnt/cell_block_d/apps/qbittorrent-vpn/* from port-sync/docker-compose.truenas.yml
+
+The active custom stack does not use the legacy `/mnt/.ix-apps/app_mounts` directories. The similarly named running containers must not be mistaken for TrueNAS-managed app references.
 
 ## Sensitive Output Handling
 
@@ -259,6 +262,8 @@ And from each app container context, verify effective access only in intended zo
 
 Before remediation phase:
 
-- Validate that qbittorrent and gluetun-vpn app_mounts directories are truly orphaned (no active TrueNAS app references).
-- If confirmed orphaned, remove /mnt/.ix-apps/app_mounts/qbittorrent and /mnt/.ix-apps/app_mounts/gluetun-vpn to reduce ownership surface.
+- Confirm no TrueNAS app config references remain for the legacy paths.
+- Confirm the active custom stack uses `/mnt/cell_block_d/apps/qbittorrent-vpn/` and is healthy.
+- Preserve a snapshot or archive of the legacy directories before removal because they contain historical config/data (`qBittorrent`, `servers.json`, and port-forward state).
+- If confirmed orphaned and backed up, remove `/mnt/.ix-apps/app_mounts/qbittorrent` and `/mnt/.ix-apps/app_mounts/gluetun-vpn`.
 - This shrinks the blast radius and clarifies that all remaining TrueNAS managed app mounts are actively reconciled.

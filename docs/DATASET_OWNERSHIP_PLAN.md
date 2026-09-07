@@ -235,8 +235,10 @@ Success criteria:
 ### Phase 1: Confirm Active vs Legacy App Mounts
 
 1. Validate qbittorrent and gluetun-vpn app mounts are orphaned from TrueNAS managed apps.
-2. If orphaned, remove those app_mounts directories.
-3. Re-run mount inventory to confirm only active managed-app mounts remain.
+2. Confirm the custom stack uses `/mnt/cell_block_d/apps/qbittorrent-vpn/` rather than `/mnt/.ix-apps/app_mounts`.
+3. Snapshot or archive the legacy directories before removal.
+4. If orphaned and backed up, remove those app_mounts directories.
+5. Re-run mount inventory to confirm only active managed-app mounts remain.
 
 Success criteria:
 
