@@ -221,6 +221,13 @@ Use [docs/DATASET_OWNERSHIP_MATRIX.md](DATASET_OWNERSHIP_MATRIX.md) to track rea
 
 Use this sequence in the next working session.
 
+## Current Status
+
+- Phase 0: complete; baseline, safety, and app/runtime evidence captured.
+- Phase 1: complete on 2026-09-07; legacy qBittorrent and Gluetun ZFS hierarchies removed and active custom services verified healthy.
+- Phase 2: next; classify media paths by actual mutation requirements.
+- Phases 3-6: pending.
+
 ### Phase 0: Pre-Flight Safety
 
 1. Confirm clean repo state and latest docs.
