@@ -125,6 +125,13 @@ The legacy paths are ZFS dataset mountpoints, not ordinary directories:
 
 Therefore they must be removed through TrueNAS dataset controls or `zfs destroy` after inventory and backup review. They cannot be quarantined with `mv`.
 
+Lifecycle hypothesis:
+
+- These datasets likely originated from earlier TrueNAS custom-app deployments.
+- Migrating ownership to the repo-managed custom stack removed the old app lifecycle reference, but did not automatically destroy its ZFS resources.
+- Treat this as orphaned-resource cleanup, not application reconfiguration.
+- Apply the same audit pattern to other historical app resources before assuming an empty-looking mount tree is safe to remove.
+
 Live Docker inspection confirmed these active mounts:
 
 - qbittorrent:
@@ -288,3 +295,10 @@ Before remediation phase:
 - Preserve a snapshot or archive of the legacy datasets before removal because they contain historical config/data (`qBittorrent`, `servers.json`, and port-forward state).
 - If confirmed orphaned and backed up, destroy the dataset hierarchies through TrueNAS or ZFS.
 - This shrinks the blast radius and clarifies that all remaining TrueNAS managed app mounts are actively reconciled.
+
+Potential orphan-resource audit targets:
+
+- `/mnt/.ix-apps/app_mounts/*` datasets no longer referenced by current app configs
+- child datasets under legacy app mount roots
+- stale app metadata entries under `/mnt/.ix-apps/metadata.yaml` and `user_config.yaml`
+- old snapshots or holds associated with retired app datasets
