@@ -243,6 +243,7 @@ Success criteria:
 Success criteria:
 
 - Active managed-app mount list excludes legacy qbittorrent/gluetun-vpn cruft.
+- Confirmed complete on 2026-09-07: both legacy ZFS hierarchies were destroyed and the custom stack remained healthy.
 
 Rollback point:
 

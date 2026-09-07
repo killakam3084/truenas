@@ -5,6 +5,7 @@ Status: first-pass derived from current dataset tree and repo deployment layout.
 Updated with verified TrueNAS app runtime details from UI snapshots on 2026-09-05.
 Updated with verified host mount roots from CLI on 2026-09-05.
 Updated with full latest-version extraction output on 2026-09-05.
+Legacy ZFS dataset cleanup completed on 2026-09-07.
 
 ## Legend
 
@@ -42,11 +43,9 @@ Updated with full latest-version extraction output on 2026-09-05.
 Verified app mount directories currently present under /mnt/.ix-apps/app_mounts:
 
 - plex
-- qbittorrent
 - tailscale
 - filebrowser
 - netdata
-- gluetun-vpn
 - grafana
 
 Verified subpaths from host `find` output:
@@ -56,13 +55,10 @@ Verified subpaths from host `find` output:
 - /mnt/.ix-apps/app_mounts/netdata/cache
 - /mnt/.ix-apps/app_mounts/netdata/lib
 - /mnt/.ix-apps/app_mounts/netdata/config
-- /mnt/.ix-apps/app_mounts/gluetun-vpn/storage_entry
 - /mnt/.ix-apps/app_mounts/tailscale/state
 - /mnt/.ix-apps/app_mounts/filebrowser/config
 - /mnt/.ix-apps/app_mounts/grafana/plugins
 - /mnt/.ix-apps/app_mounts/grafana/data
-- /mnt/.ix-apps/app_mounts/qbittorrent/config
-- /mnt/.ix-apps/app_mounts/qbittorrent/downloads
 
 ## Verified Plex Mount and Permission Facts
 
@@ -143,6 +139,13 @@ Live Docker inspection confirmed these active mounts:
   - /mnt/cell_block_d/apps/qbittorrent-vpn/gluetun-port -> /tmp/gluetun
 
 No `/mnt/.ix-apps/app_mounts/qbittorrent` or `/mnt/.ix-apps/app_mounts/gluetun-vpn` mount appears in either container.
+
+Cleanup completion:
+
+- Destroyed `cell_block_d/ix-apps/app_mounts/qbittorrent` recursively, including child datasets and snapshots.
+- Destroyed `cell_block_d/ix-apps/app_mounts/gluetun-vpn` recursively, including child datasets and snapshots.
+- Verified both legacy dataset roots no longer exist.
+- Verified `qbittorrent`, `gluetun`, and `qbittorrent-port-sync` remain healthy.
 
 ## Sensitive Output Handling
 
