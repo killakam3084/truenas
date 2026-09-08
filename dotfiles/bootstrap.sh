@@ -67,6 +67,24 @@ else
   echo "      Install with: sudo apt-get install -y zsh"
 fi
 
+# --- oh-my-zsh ---
+OMZ_DIR="$HOME_DIR/.oh-my-zsh"
+if [[ -n "$ZSH_BIN" ]] && [[ ! -d "$OMZ_DIR" ]]; then
+  if command -v git >/dev/null 2>&1; then
+    echo "==> Installing oh-my-zsh for $TARGET_USER"
+    if git clone --depth=1 https://github.com/ohmyzsh/ohmyzsh.git "$OMZ_DIR"; then
+      if [[ "$(id -un)" != "$TARGET_USER" ]]; then
+        run_as_root chown -R "$TARGET_USER" "$OMZ_DIR"
+      fi
+      echo "  installed: $OMZ_DIR"
+    else
+      echo "  warn: unable to clone oh-my-zsh (continuing)"
+    fi
+  else
+    echo "WARN: git not found; skipping oh-my-zsh install"
+  fi
+fi
+
 # --- symlink dotfiles ---
 echo "==> Linking dotfiles"
 for f in zshrc zprofile ssh/config; do

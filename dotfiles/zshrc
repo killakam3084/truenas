@@ -10,6 +10,12 @@ export PATH="$HOME/.local/bin:/usr/local/bin:$PATH"
 export TRUENAS_REPO=/mnt/cell_block_d/repos/truenas
 export APPS_DIR=/mnt/cell_block_d/apps
 
+# ── oh-my-zsh (core only; no theme — custom prompt below wins) ──────────────
+export ZSH="$HOME/.oh-my-zsh"
+ZSH_THEME=""
+plugins=(git sudo docker)
+[[ -f "$ZSH/oh-my-zsh.sh" ]] && source "$ZSH/oh-my-zsh.sh"
+
 # ── Prompt ───────────────────────────────────────────────────────────────────
 autoload -Uz colors && colors
 setopt PROMPT_SUBST
