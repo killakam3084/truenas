@@ -85,6 +85,24 @@ if [[ -n "$ZSH_BIN" ]] && [[ ! -d "$OMZ_DIR" ]]; then
   fi
 fi
 
+# --- powerlevel10k ---
+P10K_DIR="$OMZ_DIR/custom/themes/powerlevel10k"
+if [[ -d "$OMZ_DIR" ]] && [[ ! -d "$P10K_DIR" ]]; then
+  if command -v git >/dev/null 2>&1; then
+    echo "==> Installing powerlevel10k for $TARGET_USER"
+    if git clone --depth=1 https://github.com/romkatv/powerlevel10k.git "$P10K_DIR"; then
+      if [[ "$(id -un)" != "$TARGET_USER" ]]; then
+        run_as_root chown -R "$TARGET_USER" "$P10K_DIR"
+      fi
+      echo "  installed: $P10K_DIR"
+    else
+      echo "  warn: unable to clone powerlevel10k (continuing)"
+    fi
+  else
+    echo "WARN: git not found; skipping powerlevel10k install"
+  fi
+fi
+
 # --- symlink dotfiles ---
 echo "==> Linking dotfiles"
 for f in zshrc zprofile ssh/config; do
