@@ -3,3 +3,6 @@
 
 # Ensure .zshrc is sourced for login shells too
 [[ -f "$HOME/.zshrc" ]] && source "$HOME/.zshrc"
+
+# Land in the pool root on login
+[[ -d /mnt/cell_block_d ]] && cd /mnt/cell_block_d
