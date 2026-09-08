@@ -6,6 +6,7 @@
         qbittorrent-up qbittorrent-down \
         vuetorrent-install \
         logging-up logging-down \
+        terraform-plan terraform-apply \
         dotfiles help
 
 REPO_DIR           := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
@@ -13,6 +14,7 @@ INFISICAL_DIR      := $(REPO_DIR)infisical
 NGINX_DIR          := $(REPO_DIR)truenas-nginx-config
 ROON_DIR           := $(REPO_DIR)roon
 LOGGING_DIR        := $(REPO_DIR)logging
+TERRAFORM_DIR      := $(REPO_DIR)terraform
 INFISICAL_URL      := https://infisical.iillmaticc.link
 APPS_DIR           := /mnt/cell_block_d/apps
 VUETORRENT_VERSION := $(shell cat $(REPO_DIR)themes/vuetorrent.version)
@@ -51,7 +53,7 @@ pull:
 	fi
 	git pull --rebase origin main
 	@set -e; \
-	for module in certrenew port-sync rarclean rss-curator truenas-nginx-config truenas-provisioning-image; do \
+	for module in certrenew port-sync rarclean rss-curator truenas-nginx-config truenas-provisioning-image terraform; do \
 	  rebase_merge=$$(git -C $$module rev-parse --git-path rebase-merge); \
 	  rebase_apply=$$(git -C $$module rev-parse --git-path rebase-apply); \
 	  if [ -d "$$rebase_merge" ] || [ -d "$$rebase_apply" ]; then \
@@ -64,7 +66,7 @@ pull:
 	  fi; \
 	  git -C $$module pull --rebase origin main; \
 	done
-	git add .gitmodules certrenew port-sync rarclean rss-curator truenas-nginx-config truenas-provisioning-image
+	git add .gitmodules certrenew port-sync rarclean rss-curator truenas-nginx-config truenas-provisioning-image terraform
 	git -c user.name=$(GIT_USER_NAME) -c user.email=$(GIT_USER_EMAIL) commit -m "chore: advance submodule pins" || true
 
 ## Start nginx-proxy stack (host-network reverse proxy)
@@ -151,6 +153,16 @@ vuetorrent-install:
 	  rm /tmp/vuetorrent.zip; \
 	  echo "VueTorrent $(VUETORRENT_VERSION) installed to $(QBIT_THEMES_DIR)/vuetorrent"; \
 	fi
+
+## Plan terraform changes (requires backend.hcl and Infisical project set up — see terraform/README.md)
+terraform-plan:
+	$(call infisical-run,terraform,$$(. $(APPS_DIR)/terraform/.env && echo $$INFISICAL_PROJECT_ID),\
+	  terraform -chdir=$(TERRAFORM_DIR) plan)
+
+## Apply terraform changes — review the plan output first, this touches real AWS resources
+terraform-apply:
+	$(call infisical-run,terraform,$$(. $(APPS_DIR)/terraform/.env && echo $$INFISICAL_PROJECT_ID),\
+	  terraform -chdir=$(TERRAFORM_DIR) apply)
 
 ## Start Loki + Promtail logging stack
 logging-up:

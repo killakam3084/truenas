@@ -20,6 +20,7 @@ For shared-media ownership policy and remediation phases, see [docs/DATASET_OWNE
 | [`rss-curator`](rss-curator/) | RSS-driven torrent automation + web UI |
 | [`truenas-nginx-config`](truenas-nginx-config/) | nginx-proxy reverse proxy configuration (volume-mounted into container) |
 | [`truenas-provisioning-image`](truenas-provisioning-image/) | Toolbox container — bootstraps this repo onto the NAS, provides git/make/docker/infisical CLI |
+| [`terraform`](terraform/) | Terraform config for small-footprint infra in the personal AWS account |
 
 ## Bootstrap (fresh clone)
 
@@ -54,6 +55,8 @@ All targets are run from inside the provisioner container, or via the `make` ali
 | `make qbittorrent-up` | Deploy gluetun + qBittorrent + port-sync stack (installs VueTorrent first) |
 | `make qbittorrent-down` | Stop qbittorrent-vpn stack |
 | `make vuetorrent-install` | Install/upgrade VueTorrent theme (no-op if already at pinned version) |
+| `make terraform-plan` | Run `terraform plan` against the terraform submodule with secrets from Infisical |
+| `make terraform-apply` | Run `terraform apply` against the terraform submodule with secrets from Infisical |
 | `make dotfiles` | Apply `truenas_admin` dotfiles on the host |
 
 ## Healthchecks
@@ -83,6 +86,13 @@ INFISICAL_ENV=prod
 ```
 
 See each app's `.env.example` (or `.env.truenas.example`) for the full list of required variables.
+
+## Terraform / AWS Infra
+
+The [`terraform`](terraform/) submodule holds Terraform config for small-footprint
+infrastructure in the personal AWS account. See [`terraform/README.md`](terraform/README.md)
+for the full action plan and manual bootstrap prerequisites (S3 state bucket, dedicated
+IAM user, Infisical project) that must exist before `make terraform-plan` will work.
 
 ## VueTorrent Theme
 

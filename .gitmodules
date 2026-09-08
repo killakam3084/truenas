@@ -16,3 +16,6 @@
 [submodule "truenas-nginx-config"]
 	path = truenas-nginx-config
 	url = git@github.com:killakam3084/truenas-nginx-config.git
+[submodule "terraform"]
+	path = terraform
+	url = git@github.com:killakam3084/terraform.git
