@@ -23,8 +23,7 @@ file. It preserves existing authorized keys and never accepts private key data.
 
 ```sh
 sudo /mnt/cell_block_d/repos/truenas/scripts/configure-truenas-ssh.sh \
-  --public-key /path/to/id_ed25519_truenas.pub \
-  --bind-interface tailscale0
+  --public-key /path/to/id_ed25519_truenas.pub
 ```
 
 Pass `--bind-interface tailscale0` only after confirming that `tailscale0`
@@ -38,6 +37,24 @@ disables password authentication, and ensures the supplied Ed25519 public key
 belongs to `truenas_admin`. This TrueNAS release has no `rootlogin` SSH service
 property; with password authentication disabled, root cannot log in by
 password. Do not add any public key to the `root` account.
+
+## Remove an Obsolete Login Key
+
+`/home/truenas_admin/.ssh/id_ed25519` is the host's GitHub deploy key. Retain
+its private and public files while GitHub access depends on them, but remove
+that public key from the TrueNAS user SSH authorization list so it cannot be
+used to log in to the NAS. Provide the Mac's new public key as `--public-key`
+and the obsolete host public key as `--remove-public-key`:
+
+```sh
+sudo /mnt/cell_block_d/repos/truenas/scripts/configure-truenas-ssh.sh \
+  --public-key /path/to/mac-id_ed25519_truenas.pub \
+  --remove-public-key /home/truenas_admin/.ssh/id_ed25519.pub
+```
+
+This removes only an exact matching authorized-key line. Do not delete the
+host key files until the GitHub deploy identity has been intentionally replaced
+and host-to-GitHub access has been verified.
 
 ## Verify
 

@@ -4,15 +4,19 @@ set -euo pipefail
 
 USER_NAME="truenas_admin"
 PUBLIC_KEY_FILE=""
+REMOVE_PUBLIC_KEY_FILE=""
 BIND_INTERFACE=""
 
 usage() {
   cat <<'EOF'
-Usage: sudo scripts/configure-truenas-ssh.sh --public-key /path/to/key.pub [--bind-interface tailscale0]
+Usage: sudo scripts/configure-truenas-ssh.sh --public-key /path/to/key.pub [options]
 
 Installs the public key for truenas_admin, enables SSH, disables password
-login, and starts the service through TrueNAS middleware. The optional bind
-interface must already exist on the host.
+login, and starts the service through TrueNAS middleware.
+
+Options:
+  --remove-public-key /path/to/key.pub  Remove this specific existing login key.
+  --bind-interface tailscale0           Bind only to an existing host interface.
 EOF
 }
 
@@ -20,6 +24,10 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --public-key)
       PUBLIC_KEY_FILE="${2:-}"
+      shift 2
+      ;;
+    --remove-public-key)
+      REMOVE_PUBLIC_KEY_FILE="${2:-}"
       shift 2
       ;;
     --bind-interface)
@@ -59,6 +67,23 @@ if [[ ! "$PUBLIC_KEY" =~ ^ssh-ed25519\ [A-Za-z0-9+/=]+(\ [[:print:]]+)?$ ]]; the
   exit 2
 fi
 
+REMOVE_PUBLIC_KEY=""
+if [[ -n "$REMOVE_PUBLIC_KEY_FILE" ]]; then
+  if [[ ! -r "$REMOVE_PUBLIC_KEY_FILE" ]]; then
+    echo "The removal public key file is not readable: $REMOVE_PUBLIC_KEY_FILE" >&2
+    exit 2
+  fi
+  REMOVE_PUBLIC_KEY="$(tr -d '\r\n' < "$REMOVE_PUBLIC_KEY_FILE")"
+  if [[ ! "$REMOVE_PUBLIC_KEY" =~ ^ssh-ed25519\ [A-Za-z0-9+/=]+(\ [[:print:]]+)?$ ]]; then
+    echo "The removal key must be a single valid ssh-ed25519 public key." >&2
+    exit 2
+  fi
+  if [[ "$REMOVE_PUBLIC_KEY" == "$PUBLIC_KEY" ]]; then
+    echo "The login key and removal key must be different." >&2
+    exit 2
+  fi
+fi
+
 if [[ -n "$BIND_INTERFACE" ]] && ! ip link show dev "$BIND_INTERFACE" >/dev/null 2>&1; then
   echo "Bind interface does not exist: $BIND_INTERFACE" >&2
   exit 2
@@ -71,7 +96,7 @@ if [[ -z "$USER_ID" ]]; then
   exit 1
 fi
 
-USER_UPDATE_PAYLOAD="$(printf '%s' "$USER_JSON" | PUBLIC_KEY="$PUBLIC_KEY" python3 -c '
+USER_UPDATE_PAYLOAD="$(printf '%s' "$USER_JSON" | PUBLIC_KEY="$PUBLIC_KEY" REMOVE_PUBLIC_KEY="$REMOVE_PUBLIC_KEY" python3 -c '
 import json
 import os
 import sys
@@ -79,7 +104,8 @@ import sys
 users = json.load(sys.stdin)
 existing = users[0].get("sshpubkey", "").strip()
 key = os.environ["PUBLIC_KEY"]
-keys = existing.splitlines()
+remove_key = os.environ["REMOVE_PUBLIC_KEY"]
+keys = [existing_key for existing_key in existing.splitlines() if existing_key != remove_key]
 if key not in keys:
     keys.append(key)
 print(json.dumps({"sshpubkey": "\n".join(keys)}))
@@ -96,5 +122,8 @@ midclt call service.update ssh '{"enable":true}' >/dev/null
 midclt call service.start ssh >/dev/null
 
 echo "SSH access configured for $USER_NAME."
+if [[ -n "$REMOVE_PUBLIC_KEY" ]]; then
+  echo "Removed the requested obsolete login key."
+fi
 echo "Verify with: midclt call ssh.config"
 echo "Verify service with: midclt call service.query '[[\"service\",\"=\",\"ssh\"]]'"
