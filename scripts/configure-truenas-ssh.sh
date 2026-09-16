@@ -10,9 +10,9 @@ usage() {
   cat <<'EOF'
 Usage: sudo scripts/configure-truenas-ssh.sh --public-key /path/to/key.pub [--bind-interface tailscale0]
 
-Installs the public key for truenas_admin, enables SSH, disables password and
-root login, and starts the service through TrueNAS middleware. The optional
-bind interface must already exist on the host.
+Installs the public key for truenas_admin, enables SSH, disables password
+login, and starts the service through TrueNAS middleware. The optional bind
+interface must already exist on the host.
 EOF
 }
 
@@ -85,17 +85,16 @@ if key not in keys:
 print(json.dumps({"sshpubkey": "\n".join(keys)}))
 ')"
 
-SSH_UPDATE_PAYLOAD='{"passwordauth":false,"rootlogin":false}'
+SSH_UPDATE_PAYLOAD='{"passwordauth":false}'
 if [[ -n "$BIND_INTERFACE" ]]; then
-  SSH_UPDATE_PAYLOAD="$(BIND_INTERFACE="$BIND_INTERFACE" python3 -c 'import json, os; print(json.dumps({"passwordauth": False, "rootlogin": False, "bindiface": [os.environ["BIND_INTERFACE"]]}))')"
+  SSH_UPDATE_PAYLOAD="$(BIND_INTERFACE="$BIND_INTERFACE" python3 -c 'import json, os; print(json.dumps({"passwordauth": False, "bindiface": [os.environ["BIND_INTERFACE"]]}))')"
 fi
 
-midclt call user.update "$USER_ID" "$USER_UPDATE_PAYLOAD"
-midclt call ssh.update "$SSH_UPDATE_PAYLOAD"
-midclt call service.update ssh '{"enable":true}'
-midclt call service.start ssh
+midclt call user.update "$USER_ID" "$USER_UPDATE_PAYLOAD" >/dev/null
+midclt call ssh.update "$SSH_UPDATE_PAYLOAD" >/dev/null
+midclt call service.update ssh '{"enable":true}' >/dev/null
+midclt call service.start ssh >/dev/null
 
-echo "Applied SSH configuration:"
-midclt call ssh.config
-echo "Service configuration:"
-midclt call service.query '[["service","=","ssh"]]'
+echo "SSH access configured for $USER_NAME."
+echo "Verify with: midclt call ssh.config"
+echo "Verify service with: midclt call service.query '[[\"service\",\"=\",\"ssh\"]]'"

@@ -34,8 +34,10 @@ Tailscale-only boundary.
 
 The script uses `midclt` rather than editing `/etc/ssh/sshd_config`, which
 TrueNAS owns and may regenerate. It enables SSH at boot, starts it now,
-disables password authentication and root login, and ensures the supplied
-Ed25519 public key belongs to `truenas_admin`.
+disables password authentication, and ensures the supplied Ed25519 public key
+belongs to `truenas_admin`. This TrueNAS release has no `rootlogin` SSH service
+property; with password authentication disabled, root cannot log in by
+password. Do not add any public key to the `root` account.
 
 ## Verify
 
