@@ -62,23 +62,50 @@ Phase 6: docs + CHANGELOG   — user-facing summary + release tag
      - `feat(ui): stats mini-panel and log drawer`
      - `chore: CHANGELOG and version bump for v0.15.0`
 
-6. **Tag release when requested**
-   - Apply tag only on the final phase commit (changelog + version bump).
-   - Use semantic version tags: `vMAJOR.MINOR.PATCH`.
-   - Annotated tag format:
-     - `git tag -a vX.Y.Z -m "Release vX.Y.Z: <summary>"`
+6. **Cut or reuse a release branch, then tag**
+   - This step's RC/UAT/promote tooling currently exists for **rss-curator
+     only**; other submodules still tag directly on `main` as before.
+   - Release branches are named `release/X.Y` — one per **minor** line,
+     reused across patch releases (never deleted after merge-back).
+     - New minor/major: `git checkout -b release/X.Y main`.
+     - Patch on an existing line: `git checkout release/X.Y && git pull`.
+   - Do the version-bump + CHANGELOG commit (step 4/5 above) on this branch,
+     not on `main`.
+   - Push the branch (`git push -u origin release/X.Y`) — CI runs test/lint
+     against it automatically.
+   - **Validate before tagging:** `make rc-release` (builds+pushes a
+     multi-arch `rc-<shortsha>` image tied to this exact commit), then
+     `make uat-up REF=rc-<shortsha>` + `make uat-validate` locally — only
+     proceed to tag if this passes. `make uat-down` when done.
+   - Apply the tag on the release branch's HEAD commit: `git tag -a vX.Y.Z
+     -m "Release vX.Y.Z: <summary>"`.
 
 7. **Push in order**
-   - `git push`
-   - `git push --tags` (when a tag was created)
+   - `git push` (release branch, if not already pushed)
+   - `git push --tags` — triggers CI's `promote` job, which retags the
+     already-validated `rc-<shortsha>` manifest as `vX.Y.Z`/`X.Y`/`latest`
+     (no rebuild — this is what guarantees the deployed artifact is
+     byte-identical to what `uat-validate` tested).
 
 8. **Post-push verification**
-   - Confirm CI is running and green.
-   - If failures occur, fix-forward with a focused follow-up commit.
+   - Confirm the `promote` CI job is green (it fails loudly if the version
+     constant doesn't match the tag, or if no matching `rc-<shortsha>` image
+     exists — both indicate skipped UAT validation).
+   - Deploy: bump `RSS_CURATOR_IMAGE_TAG` in the TrueNAS `apps/rss-curator/.env`
+     to the new tag, `make rss-curator-up`, confirm the stack is healthy.
+   - Once deployment is confirmed stable, open a GitHub PR `release/X.Y` →
+     `main` and **squash merge**. Do not delete `release/X.Y` — it's reused
+     for the next patch on that minor line.
+   - If failures occur at any step, fix-forward with a focused follow-up
+     commit on the release branch (re-run `rc-release`/`uat-validate` before
+     re-tagging).
 
 ## CI Expectations
-- Build/push jobs must depend on passing test/lint phases.
+- Promote/build/push jobs must depend on passing test/lint phases.
 - Do not bypass failing test/lint checks.
+- (rss-curator) Never tag a release without a prior `make rc-release` +
+  `make uat-validate` pass — the CI `promote` job enforces this by failing
+  if no matching `rc-<shortsha>` image exists for the tagged commit.
 
 ## Functional (E2E) Test Coverage
 

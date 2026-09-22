@@ -111,6 +111,8 @@ certrenew-run:
 	docker compose -f $(REPO_DIR)certrenew/docker-compose.yaml run --rm certrenew
 
 ## Deploy rss-curator stack with secrets from Infisical
+## Requires RSS_CURATOR_IMAGE_TAG=vX.Y.Z in apps/rss-curator/.env (no `latest` —
+## sourced via infisical-run's `set -a` before docker compose runs).
 rss-curator-up:
 	$(call infisical-run,rss-curator,$$(. $(APPS_DIR)/rss-curator/.env && echo $$INFISICAL_PROJECT_ID),\
 	  docker compose -f $(REPO_DIR)rss-curator/docker-compose.truenas.yml up -d)
