@@ -92,7 +92,10 @@ Phase 6: docs + CHANGELOG   — user-facing summary + release tag
      constant doesn't match the tag, or if no matching `rc-<shortsha>` image
      exists — both indicate skipped UAT validation).
    - Deploy: bump `RSS_CURATOR_IMAGE_TAG` in the TrueNAS `apps/rss-curator/.env`
-     to the new tag, `make rss-curator-up`, confirm the stack is healthy.
+     to the new version — **bare semver, no leading `v`** (GHCR image tags
+     drop it even though the git tag keeps `vX.Y.Z`; e.g. git tag `v0.55.0` →
+     `RSS_CURATOR_IMAGE_TAG=0.55.0`), then `make rss-curator-up`, confirm the
+     stack is healthy.
    - Once deployment is confirmed stable, open a GitHub PR `release/X.Y` →
      `main` and **squash merge**. Do not delete `release/X.Y` — it's reused
      for the next patch on that minor line.
