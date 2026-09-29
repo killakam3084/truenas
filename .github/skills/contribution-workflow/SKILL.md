@@ -75,10 +75,11 @@ Phase 6: docs + CHANGELOG   — user-facing summary + release tag
      against it automatically.
    - **Validate before tagging:** push the release branch and let GitHub Actions
      build and publish the Linux/amd64 `rc-<sha>` image for that exact commit.
-     Pull it with `make uat-up REF=rc-<sha>` and run `make uat-validate` locally
-     or from the NAS-like validation environment — only proceed to tag if this
-     passes. `make uat-down` when done. Local `make rc-release` is optional
-     developer tooling, not the canonical RC path.
+    Pull it with `make uat-up REF=rc-<sha>` and run `make uat-validate`, then
+    run the deterministic integration mesh with `make uat-mesh-up REF=rc-<sha>`
+    and `make uat-mesh-validate`. Only proceed to tag after both pass.
+    `make uat-down` and `make uat-mesh-down` when done. Local
+    `make rc-release` is optional developer tooling, not the canonical RC path.
    - Apply the tag on the release branch's HEAD commit: `git tag -a vX.Y.Z
      -m "Release vX.Y.Z: <summary>"`.
 
