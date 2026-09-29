@@ -73,10 +73,12 @@ Phase 6: docs + CHANGELOG   — user-facing summary + release tag
      not on `main`.
    - Push the branch (`git push -u origin release/X.Y`) — CI runs test/lint
      against it automatically.
-   - **Validate before tagging:** `make rc-release` (builds+pushes a
-     multi-arch `rc-<shortsha>` image tied to this exact commit), then
-     `make uat-up REF=rc-<shortsha>` + `make uat-validate` locally — only
-     proceed to tag if this passes. `make uat-down` when done.
+   - **Validate before tagging:** push the release branch and let GitHub Actions
+     build and publish the Linux/amd64 `rc-<sha>` image for that exact commit.
+     Pull it with `make uat-up REF=rc-<sha>` and run `make uat-validate` locally
+     or from the NAS-like validation environment — only proceed to tag if this
+     passes. `make uat-down` when done. Local `make rc-release` is optional
+     developer tooling, not the canonical RC path.
    - Apply the tag on the release branch's HEAD commit: `git tag -a vX.Y.Z
      -m "Release vX.Y.Z: <summary>"`.
 
@@ -106,9 +108,9 @@ Phase 6: docs + CHANGELOG   — user-facing summary + release tag
 ## CI Expectations
 - Promote/build/push jobs must depend on passing test/lint phases.
 - Do not bypass failing test/lint checks.
-- (rss-curator) Never tag a release without a prior `make rc-release` +
-  `make uat-validate` pass — the CI `promote` job enforces this by failing
-  if no matching `rc-<shortsha>` image exists for the tagged commit.
+- (rss-curator) Never tag a release without a prior GitHub Actions RC build
+  and `make uat-validate` pass — the CI `promote` job enforces this by failing
+  if no matching `rc-<sha>` image exists for the tagged commit.
 
 ## Functional (E2E) Test Coverage
 
