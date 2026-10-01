@@ -119,7 +119,7 @@ rss-curator-up:
 
 ## Stop rss-curator stack
 rss-curator-down:
-	docker compose -f $(REPO_DIR)rss-curator/docker-compose.truenas.yml down
+	docker compose --env-file $(APPS_DIR)/rss-curator/.env -f $(REPO_DIR)rss-curator/docker-compose.truenas.yml down
 
 ## Deploy rarclean with secrets from Infisical
 rarclean-up:
