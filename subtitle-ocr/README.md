@@ -64,6 +64,27 @@ python3 -m venv /tmp/subtitle-ocr-venv
 /tmp/subtitle-ocr-venv/bin/python -m unittest discover -s subtitle-ocr -v
 ```
 
-The image build also runs the unit tests. Runtime is limited to two CPU cores and
-1 GB memory by the supplied Compose file. Network downloads happen during build
-only. This is an on-demand MVP, not an automatic acquisition or release pipeline.
+The image build also runs the unit tests. Runtime defaults to two CPU cores and
+1 GB memory. Override `SUBTITLE_CPUS`, `SUBTITLE_MEMORY`, and
+`SUBTITLE_OCR_THREADS` (Tesseract's per-engine OpenMP limit, default 2) when
+invoking Compose. The converter also processes cues in parallel, so raising the
+OpenMP limit is not the same as assigning more CPUs and can oversubscribe them.
+Network downloads happen during build only. This is an on-demand MVP, not an
+automatic acquisition or release pipeline.
+
+## NAS Benchmark
+
+Single-run comparison on the dual Xeon E5-2680 v4 NAS (28 physical cores, 56 logical
+CPUs), using the same 932-cue episode 4 normalized PGS stream, 2 GiB memory, and
+`SUBTITLE_OCR_THREADS=2`:
+
+| CPU Quota | OCR Container Wall Time | Output |
+|---|---|---|
+| 2 CPUs | 128.8 seconds | Identical to validated reference |
+| 8 CPUs | 33.2 seconds | Identical to validated reference |
+
+This was a 3.88x speedup for OCR only, including container startup but excluding
+extraction and normalization. It is not a repeated statistical benchmark. Use
+`SUBTITLE_CPUS=8 SUBTITLE_MEMORY=2g` for this host's batch, keeping the conservative
+defaults for other hosts. Pass these variables explicitly through `sudo env` when
+needed. JSONL outcomes include `elapsed_seconds` for each complete intake operation.

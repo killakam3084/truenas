@@ -212,12 +212,14 @@ def main():
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         for video in sorted(videos, key=lambda path: (arguments.priority not in path.name, str(path))):
             print(f'PROCESSING {video}', flush=True)
+            started = time.perf_counter()
             try:
                 result = process(video, arguments.work, arguments.min_age, arguments.dry_run)
             except Exception as error:
                 failed = True
                 result = {'status': 'failed', 'error': str(error)}
-            result.update(video=str(video), timestamp=time.time())
+            result.update(video=str(video), timestamp=time.time(),
+                          elapsed_seconds=round(time.perf_counter() - started, 3))
             encoded = json.dumps(result)
             print(encoded, flush=True)
             with (arguments.work / 'results.jsonl').open('a') as report:

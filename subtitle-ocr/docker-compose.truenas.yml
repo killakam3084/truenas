@@ -10,9 +10,11 @@ services:
       - ALL
     security_opt:
       - no-new-privileges:true
-    cpus: 2
-    mem_limit: 1g
+    cpus: ${SUBTITLE_CPUS:-2}
+    mem_limit: ${SUBTITLE_MEMORY:-1g}
     pids_limit: 128
+    environment:
+      OMP_THREAD_LIMIT: ${SUBTITLE_OCR_THREADS:-2}
     tmpfs:
       - /tmp:rw,nosuid,nodev,size=256m
     volumes:
