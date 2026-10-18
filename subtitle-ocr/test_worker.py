@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from worker import existing_sidecar, normalize, presentations, process, publish, select_track, validate
+from worker import existing_sidecar, main, normalize, presentations, process, publish, select_track, validate
 
 
 def segment(kind, payload, timestamp):
@@ -94,6 +94,18 @@ class WorkerTests(unittest.TestCase):
         with patch('worker.subprocess.check_output') as inspect:
             self.assertEqual(process(video, self.root, 0, False)['status'], 'skipped')
             inspect.assert_not_called()
+
+    def test_broad_directory_pattern_selects_only_mkvs(self):
+        video = self.root / 'S01E04.mkv'
+        video.touch()
+        video.with_suffix('.en.srt').touch()
+        arguments = ['worker', '--work', str(self.root / 'work'),
+                     '--pattern', '*S01E04*', str(self.root)]
+        with patch('sys.argv', arguments), \
+                patch('worker.process', return_value={'status': 'skipped'}) as process_file:
+            self.assertEqual(main(), 0)
+            self.assertEqual(process_file.call_count, 1)
+            self.assertEqual(process_file.call_args.args[0], video)
 
     def test_changed_source_is_not_published(self):
         video = self.root / 'video.mkv'

@@ -144,7 +144,7 @@ def fingerprint(path):
 
 
 def process(video, work, min_age, dry_run):
-    if video.is_symlink() or not video.is_file():
+    if video.suffix.lower() != '.mkv' or video.is_symlink() or not video.is_file():
         raise ValueError('Input must be a regular non-symlink file')
     sidecar = existing_sidecar(video)
     if sidecar:
@@ -200,7 +200,11 @@ def main():
     arguments.work.mkdir(parents=True, exist_ok=True)
     videos = set()
     for source in arguments.inputs:
-        videos.update(source.glob(arguments.pattern) if source.is_dir() else [source])
+        if source.is_dir():
+            videos.update(path for path in source.glob(arguments.pattern)
+                          if path.suffix.lower() == '.mkv' and path.is_file())
+        else:
+            videos.add(source)
     if not videos:
         parser.error('No input files matched')
     failed = False
