@@ -1,0 +1,28 @@
+services:
+  subtitle-ocr:
+    image: truenas/subtitle-ocr:0.1.0
+    build: .
+    user: "950:950"
+    restart: "no"
+    network_mode: none
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    cpus: 2
+    mem_limit: 1g
+    pids_limit: 128
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,size=256m
+    volumes:
+      - type: bind
+        source: ${SUBTITLE_MEDIA_DIR:?Set SUBTITLE_MEDIA_DIR to a completed media directory}
+        target: /media
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${SUBTITLE_WORK_DIR:-/mnt/cell_block_d/apps/subtitle-ocr/work}
+        target: /work
+        bind:
+          create_host_path: false

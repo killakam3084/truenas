@@ -6,6 +6,11 @@ Monorepo (git submodule pattern) for all TrueNAS SCALE configuration, custom app
 
 For the known-good host/provisioner convergence workflow, see [docs/STABILITY_CHECKPOINT.md](docs/STABILITY_CHECKPOINT.md).
 
+## Subtitle Intake
+
+For on-demand English subtitle extraction and PGS OCR from completed MKVs, see
+[subtitle-ocr/README.md](subtitle-ocr/README.md).
+
 ## Dataset Ownership
 
 For shared-media ownership policy and remediation phases, see [docs/DATASET_OWNERSHIP_PLAN.md](docs/DATASET_OWNERSHIP_PLAN.md).
