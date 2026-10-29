@@ -1,7 +1,10 @@
 services:
   subtitle-ocr:
     image: truenas/subtitle-ocr:0.1.0
-    build: .
+    build:
+      context: .
+      args:
+        SUBTITLE_REVISION: ${SUBTITLE_REVISION:-unknown}
     user: "950:950"
     restart: "no"
     network_mode: none
@@ -15,6 +18,7 @@ services:
     pids_limit: 128
     environment:
       OMP_THREAD_LIMIT: ${SUBTITLE_OCR_THREADS:-2}
+      SUBTITLE_IMAGE_ID: ${SUBTITLE_IMAGE_ID:-unknown}
     tmpfs:
       - /tmp:rw,nosuid,nodev,size=256m
     volumes:

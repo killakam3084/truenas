@@ -13,6 +13,8 @@ RUN python3 -m venv /opt/venv \
     && echo '7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2  tessdata/eng.traineddata' | sha256sum -c -
 COPY worker.py test_worker.py ./
 RUN /opt/venv/bin/python -m unittest -v
+ARG SUBTITLE_REVISION=unknown
+ENV SUBTITLE_REVISION=${SUBTITLE_REVISION}
 ENV PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1 OMP_THREAD_LIMIT=2 DOTNET_CLI_TELEMETRY_OPTOUT=1
 USER 950:950
 ENTRYPOINT ["/opt/venv/bin/python", "/opt/subtitle-ocr/worker.py"]

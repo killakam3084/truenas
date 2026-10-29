@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from worker import existing_sidecar, main, normalize, presentations, process, publish, select_track, validate
+from worker import ValidationError, existing_sidecar, main, normalize, presentations, process, publish, runtime_context, select_track, validate
 
 
 def segment(kind, payload, timestamp):
@@ -73,6 +73,45 @@ class WorkerTests(unittest.TestCase):
         self.assertEqual(select_track(metadata)['id'], 5)
         metadata['tracks'] = metadata['tracks'][:1]
         self.assertEqual(select_track(metadata)['id'], 2)
+
+    def test_empty_ocr_cue_reports_index_and_timestamp(self):
+        subtitle = self.root / 'empty.srt'
+        subtitle.write_text('1\n00:00:01,000 --> 00:00:02,000\n \n\n')
+        with self.assertRaises(ValidationError) as failure:
+            validate(subtitle, 3000, [(1000, 2000)])
+        self.assertEqual(failure.exception.details['cue_index'], 1)
+        self.assertEqual(failure.exception.details['start_ms'], 1000)
+        self.assertTrue(failure.exception.details['empty_content'])
+
+    def test_batch_failure_preserves_staging_and_provenance(self):
+        video = self.root / 'video.mkv'
+        video.touch()
+        staging = self.root / 'staging'
+        staging.mkdir()
+
+        def fail(source, work, min_age, dry_run, details):
+            details.update(staging=str(staging), phase='validation')
+            raise ValidationError('Empty cue', cue_index=941, start_ms=1000)
+
+        arguments = ['worker', '--work', str(self.root / 'work'), str(video)]
+        with patch('sys.argv', arguments), patch('worker.process', side_effect=fail):
+            self.assertEqual(main(), 1)
+        result = json.loads((staging / 'result.json').read_text())
+        self.assertEqual(result['staging'], str(staging))
+        self.assertEqual(result['phase'], 'validation')
+        self.assertEqual(result['error_details']['cue_index'], 941)
+        self.assertIn('image_id', result['provenance'])
+        self.assertEqual(json.loads((self.root / 'work/results.jsonl').read_text()), result)
+
+    def test_runtime_context_records_deployment_identity(self):
+        environment = {'SUBTITLE_IMAGE_ID': 'sha256:test-image',
+                       'SUBTITLE_REVISION': 'test-revision', 'OMP_THREAD_LIMIT': '2'}
+        with patch.dict('os.environ', environment):
+            context = runtime_context()
+        self.assertEqual(context['image_id'], environment['SUBTITLE_IMAGE_ID'])
+        self.assertEqual(context['revision'], environment['SUBTITLE_REVISION'])
+        self.assertEqual(context['ocr_threads'], '2')
+        self.assertIsInstance(context['resource_limits'], dict)
 
     def test_atomic_publication_never_overwrites_and_cleans_temporary(self):
         source = self.root / 'source.srt'

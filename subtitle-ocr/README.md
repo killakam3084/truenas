@@ -13,14 +13,16 @@ never opens video files for writing. Do not grant it the entire media dataset.
 ```sh
 export SUBTITLE_MEDIA_DIR='/mnt/cell_block_d/media/video/television/The West Wing S01 br 10bit hevc-d3g'
 export SUBTITLE_WORK_DIR=/mnt/cell_block_d/apps/subtitle-ocr/work
+export SUBTITLE_REVISION="$(git rev-parse HEAD)"
 mkdir -p "$SUBTITLE_WORK_DIR"
 docker compose -f subtitle-ocr/docker-compose.truenas.yml build
+export SUBTITLE_IMAGE_ID="$(docker image inspect --format '{{.Id}}' truenas/subtitle-ocr:0.1.0)"
 docker compose -f subtitle-ocr/docker-compose.truenas.yml run --rm subtitle-ocr --dry-run --pattern '*S01E04*' /media
 docker compose -f subtitle-ocr/docker-compose.truenas.yml run --rm subtitle-ocr --pattern '*S01E04*' /media
 ```
 
-Use `sudo -n docker` on a host where Docker requires elevation; preserve the two
-environment variables explicitly when invoking Compose through sudo.
+Use `sudo -n docker` on a host where Docker requires elevation; preserve the
+`SUBTITLE_*` environment variables explicitly when invoking Compose through sudo.
 
 Pass individual container paths to select a batch, or pass a directory and a glob.
 `--priority S01E04` processes matching names before other selected files. Directory
@@ -50,8 +52,17 @@ completion. No watcher or downloader integration is installed by this MVP.
 - The image pins PgsToSrt by digest and verifies the English OCR model checksum.
   Python and system extraction packages are installed at image build time.
 
-`/work/results.jsonl` contains per-file outcomes. Per-file staging directories
-retain extracted PGS, normalized PGS, and SRT candidates for inspection. These can
+`/work/results.jsonl` contains per-file outcomes, grouped by run ID, with deployed
+revision, supplied image ID, OCR thread limit, and available cgroup CPU/memory
+limits. The revision is baked into the image at build time; image ID must be
+supplied at runtime as shown above. Unspecified identities are recorded as
+`unknown`; no Docker socket is required.
+
+Per-file staging directories retain MKV metadata, a `result.json` report,
+extracted PGS, normalized PGS, and SRT candidates for inspection. Failures retain
+the processing phase, staging path, and structured validation details, including
+the cue index and timestamps when applicable. OCR results also record the model
+SHA256. These can
 consume tens of MB per episode; remove reviewed staging directories manually.
 Reruns skip published sidecars. Nothing rescans Plex automatically; use a library
 scan if Plex has not detected the external English SRT.
