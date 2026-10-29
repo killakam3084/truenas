@@ -4,6 +4,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import struct
 import subprocess
@@ -30,6 +31,21 @@ def runtime_context():
             'revision': os.environ.get('SUBTITLE_REVISION', 'unknown'),
             'ocr_threads': os.environ.get('OMP_THREAD_LIMIT', 'unknown'),
             'resource_limits': limits}
+
+
+# Tesseract reads the subtitle font's capital I as a pipe or a lone lowercase l.
+MISREAD_I = re.compile(r'\||(?<![A-Za-z])l(?![A-Za-z])')
+
+
+def correct_ocr(source, destination):
+    cues = list(srt.parse(source.read_text(encoding='utf-8-sig')))
+    corrections = 0
+    for cue in cues:
+        cue.content, count = MISREAD_I.subn('I', cue.content)
+        corrections += count
+    with destination.open('x', encoding='utf-8') as output:
+        output.write(srt.compose(cues, reindex=False))
+    return corrections
 
 
 def presentations(path):
@@ -211,9 +227,11 @@ def process(video, work, min_age, dry_run, details=None):
         model = Path('/opt/subtitle-ocr/tessdata/eng.traineddata')
         details.update(phase='ocr', expected_cues=len(intervals),
                        model_sha256=hashlib.sha256(model.read_bytes()).hexdigest())
+        raw = staging / 'ocr.raw.srt'
         subprocess.run(['dotnet', '/app/PgsToSrt.dll', '--input', str(normalized),
-                        '--output', str(candidate), '--tesseractdata', '/opt/subtitle-ocr/tessdata',
+                        '--output', str(raw), '--tesseractdata', '/opt/subtitle-ocr/tessdata',
                         '--tesseractlanguage', 'eng', '--tesseractversion', '5'], check=True)
+        details.update(phase='correction', ocr_corrections=correct_ocr(raw, candidate))
         method = 'pgs-ocr'
     details.update(phase='validation', method=method)
     count = validate(candidate, duration_ms, intervals)

@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from worker import ValidationError, existing_sidecar, main, normalize, presentations, process, publish, runtime_context, select_track, validate
+from worker import ValidationError, correct_ocr, existing_sidecar, main, normalize, presentations, process, publish, runtime_context, select_track, validate
 
 
 def segment(kind, payload, timestamp):
@@ -102,6 +102,19 @@ class WorkerTests(unittest.TestCase):
         self.assertEqual(result['error_details']['cue_index'], 941)
         self.assertIn('image_id', result['provenance'])
         self.assertEqual(json.loads((self.root / 'work/results.jsonl').read_text()), result)
+
+    def test_corrects_misread_capital_i_without_changing_timing(self):
+        raw = self.root / 'raw.srt'
+        corrected = self.root / 'corrected.srt'
+        raw.write_text('7\n00:00:01,000 --> 00:00:02,000\n'
+                       "| left. l-| BEG, 'l'm |CAN, well before l..\n"
+                       'Lloyd will lull |\n\n')
+        self.assertEqual(correct_ocr(raw, corrected), 7)
+        self.assertEqual(corrected.read_text(), '7\n00:00:01,000 --> 00:00:02,000\n'
+                         "I left. I-I BEG, 'I'm ICAN, well before I..\n"
+                         'Lloyd will lull I\n\n')
+        with self.assertRaises(FileExistsError):
+            correct_ocr(raw, corrected)
 
     def test_runtime_context_records_deployment_identity(self):
         environment = {'SUBTITLE_IMAGE_ID': 'sha256:test-image',
