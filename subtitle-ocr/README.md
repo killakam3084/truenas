@@ -88,3 +88,21 @@ extraction and normalization. It is not a repeated statistical benchmark. Use
 `SUBTITLE_CPUS=8 SUBTITLE_MEMORY=2g` for this host's batch, keeping the conservative
 defaults for other hosts. Pass these variables explicitly through `sudo env` when
 needed. JSONL outcomes include `elapsed_seconds` for each complete intake operation.
+
+## Season 1 Intake Results
+
+The West Wing episodes 03-22 were exercised through this MVP. Episode 04 was
+published first, with 932 validated cues. The remaining batch used 8 CPUs and
+2 GiB memory, one episode at a time:
+
+- 19 of 20 requested episodes published with validated cue counts, source timing,
+  and matching staged/published hashes. No MKVs were changed or sidecars replaced.
+- The 18 successful files timed at 8 CPUs took 33.2-46.2 seconds each for the full
+  workflow, with a median of 38.2 seconds. Episode 04's initial 2-CPU run is excluded.
+- Episode 17 was withheld because cue 941 had no recognized text. A manual retry
+  using `tessdata_best` also failed the same gate. Its staged candidates remain for
+  review; there is deliberately no sidecar for that episode and no silent cue drop.
+
+This verifies the publication gates and throughput, not the spelling accuracy of
+every OCR cue. Episode 02 was separately confirmed in playback by the user. Source
+PGS subtitles remain available for the withheld episode.
