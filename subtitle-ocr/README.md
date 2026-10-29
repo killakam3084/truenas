@@ -117,3 +117,22 @@ published first, with 932 validated cues. The remaining batch used 8 CPUs and
 This verifies the publication gates and throughput, not the spelling accuracy of
 every OCR cue. Episode 02 was separately confirmed in playback by the user. Source
 PGS subtitles remain available for the withheld episode.
+
+## Seasons 2-4 Intake Results
+
+Run one episode at a time with 16 CPUs and 4 GiB memory:
+
+| Season | Published | Withheld (empty OCR cue) | Median full-workflow time |
+|---|---|---|---|
+| 2 | 21 of 22 | E20, cue 805 | 26.1 seconds |
+| 3 | 20 of 21 | E13, cue 204 | 23.1 seconds |
+| 4 | 21 of 22 (E01-E02 is one file) | E13, cue 633 | 23.7 seconds |
+
+Tesseract reads this subtitle font's capital I as `|` or a standalone `l`. OCR
+output is now corrected for those glyphs only, retaining the raw result as
+`ocr.raw.srt`; cue numbering and timing are unchanged and still validated. Sidecars
+published before this correction were rewritten once after verifying each still
+matched its staged original; originals remain in their staging directories.
+
+Four episodes across seasons 1-4 have each failed on one empty OCR cue. They remain
+unpublished pending review of the source images.

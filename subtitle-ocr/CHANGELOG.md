@@ -15,3 +15,4 @@
 
 ### Fixed
 - Limit directory glob matches to MKVs so newly created sidecars never become inputs.
+- Correct capital I misread by OCR as `|` or a standalone `l`, retaining raw OCR output.
