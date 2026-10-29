@@ -53,24 +53,25 @@ def ocr_subtitle(normalized, intervals, staging, details):
     details.update(phase='ocr', expected_cues=len(intervals), ocr_engine=f'tesseract {ocr.version()}',
                    ocr_workers=workers, model_sha256=hashlib.sha256(model.read_bytes()).hexdigest())
     results = ocr.recognize_all(shown, workers)
-    cues, report, fallbacks, corrections = [], [], [], 0
+    cues, report, unread, corrections = [], [], [], 0
     for position, ((start, end), result) in enumerate(zip(intervals, results), 1):
         text, count = correct_ocr(result.text)
         corrections += count
         report.append({'cue': position, 'start_ms': start, 'end_ms': end, 'raw': result.text,
-                       'text': text, 'fallback': result.fallback})
-        if result.fallback:
-            (staging / f'cue-{position:04d}.pgm').write_bytes(result.image)
-            fallbacks.append({'cue': position, 'start_ms': start, 'text': text})
+                       'text': text, 'unread_regions': len(result.unread)})
+        for region, image in enumerate(result.unread, 1):
+            (staging / f'cue-{position:04d}-region-{region}.pgm').write_bytes(image)
+        if result.unread:
+            unread.append({'cue': position, 'start_ms': start, 'end_ms': end,
+                           'regions': len(result.unread), 'text': text})
         cues.append(srt.Subtitle(position, timedelta(milliseconds=start), timedelta(milliseconds=end), text))
     (staging / 'ocr.json').write_text(json.dumps(report, indent=1) + '\n')
-    details.update(ocr_corrections=corrections, ocr_fallbacks=fallbacks)
-    for cue in cues:
-        if not cue.content:
-            start = cue.start.total_seconds() * 1000
-            raise ValidationError(f'Invalid cue number/content at {cue.index}', position=cue.index,
-                                  cue_index=cue.index, start_ms=start,
-                                  end_ms=cue.end.total_seconds() * 1000, empty_content=True)
+    details.update(ocr_corrections=corrections, ocr_unread=unread)
+    if unread:
+        first = unread[0]
+        raise ValidationError(f'Unread text region in cue {first["cue"]}', position=first['cue'],
+                              cue_index=first['cue'], start_ms=first['start_ms'], end_ms=first['end_ms'],
+                              empty_content=not first['text'], unread_cues=len(unread))
     return srt.compose(cues, reindex=False)
 
 

@@ -126,27 +126,31 @@ class WorkerTests(unittest.TestCase):
             self.addCleanup(active.stop)
         return normalized, intervals
 
-    def test_ocr_builds_cues_from_source_timing_and_records_fallbacks(self):
-        normalized, intervals = self.ocr_fixture([ocr.Recognition('| left\nearly.', False, None),
-                                                  ocr.Recognition('|...', True, b'P5 image')])
+    def test_ocr_builds_cues_from_source_timing(self):
+        normalized, intervals = self.ocr_fixture([ocr.Recognition('| left\nearly.', []),
+                                                  ocr.Recognition('|...', [])])
         details = {}
         text = ocr_subtitle(normalized, intervals, self.root, details)
         self.assertEqual(text, '1\n00:00:01,000 --> 00:00:02,000\nI left\nearly.\n\n'
                                '2\n00:00:03,000 --> 00:00:04,000\nI...\n\n')
-        self.assertEqual(details['ocr_fallbacks'], [{'cue': 2, 'start_ms': 3000.0, 'text': 'I...'}])
+        self.assertEqual(details['ocr_unread'], [])
         self.assertEqual((details['ocr_corrections'], details['ocr_workers']), (2, 3))
         self.assertEqual(details['ocr_engine'], 'tesseract 5.3.0')
-        self.assertEqual((self.root / 'cue-0002.pgm').read_bytes(), b'P5 image')
         self.assertEqual(json.loads((self.root / 'ocr.json').read_text())[0]['raw'], '| left\nearly.')
 
-    def test_ocr_rejects_unrecovered_empty_cue_after_reporting(self):
-        normalized, intervals = self.ocr_fixture([ocr.Recognition('Hello', False, None),
-                                                  ocr.Recognition('', True, b'P5 image')])
-        with self.assertRaises(ValidationError) as failure:
-            ocr_subtitle(normalized, intervals, self.root, {})
-        self.assertEqual((failure.exception.details['cue_index'], failure.exception.details['start_ms']),
-                         (2, 3000.0))
-        self.assertEqual(len(json.loads((self.root / 'ocr.json').read_text())), 2)
+    def test_ocr_withholds_any_cue_with_an_unread_region(self):
+        for text in ('', 'SEE?'):
+            with self.subTest(text=text):
+                self.root = Path(tempfile.mkdtemp(dir=self.temporary.name))
+                normalized, intervals = self.ocr_fixture([ocr.Recognition('Hello', []),
+                                                          ocr.Recognition(text, [b'P5 image'])])
+                with self.assertRaises(ValidationError) as failure:
+                    ocr_subtitle(normalized, intervals, self.root, {})
+                details = failure.exception.details
+                self.assertEqual((details['cue_index'], details['start_ms'], details['empty_content']),
+                                 (2, 3000.0, not text))
+                self.assertEqual((self.root / 'cue-0002-region-1.pgm').read_bytes(), b'P5 image')
+                self.assertEqual(len(json.loads((self.root / 'ocr.json').read_text())), 2)
 
     def test_runtime_context_records_deployment_identity(self):
         environment = {'SUBTITLE_IMAGE_ID': 'sha256:test-image',

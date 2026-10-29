@@ -5,11 +5,11 @@ import math
 import os
 from pathlib import Path
 
-from pgs import pgm, render
+from pgs import pgm, regions, render
 
 TESSDATA = Path('/opt/subtitle-ocr/tessdata')
-BLOCK, SINGLE_LINE = 6, 7
-Recognition = namedtuple('Recognition', 'text fallback image')
+SINGLE_LINE = 7
+Recognition = namedtuple('Recognition', 'text unread')
 
 
 def library():
@@ -52,12 +52,15 @@ class Tesseract:
         return '\n'.join(line.strip() for line in text.splitlines() if line.strip())
 
     def recognize(self, display_set):
-        bitmap = render(display_set)
-        text = self.read(bitmap, BLOCK)
-        if text:
-            return Recognition(text, False, None)
-        # Block layout analysis discards isolated narrow glyphs such as a lone "I".
-        return Recognition(self.read(bitmap, SINGLE_LINE), True, pgm(bitmap))
+        # Tesseract's block layout analysis can drop separately placed speaker lines.
+        lines, unread = [], []
+        for region in regions(render(display_set)):
+            text = self.read(region, SINGLE_LINE)
+            if text:
+                lines.append(text)
+            else:
+                unread.append(pgm(region))
+        return Recognition('\n'.join(lines), unread)
 
     def close(self):
         self.lib.TessBaseAPIEnd(self.api)

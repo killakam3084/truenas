@@ -119,3 +119,38 @@ def render(display_set, padding=30):
 
 def pgm(bitmap):
     return b'P5\n%d %d\n255\n' % (bitmap.width, bitmap.height) + bitmap.pixels
+
+
+INK = bytes(1 if value < 128 else 0 for value in range(256))
+
+
+def _runs(mask, bridge):
+    runs = []
+    for index, value in enumerate(mask):
+        if value:
+            if runs and index - runs[-1][1] <= bridge:
+                runs[-1][1] = index + 1
+            else:
+                runs.append([index, index + 1])
+    return runs
+
+
+def regions(bitmap, padding=30, line_bridge=4):
+    """Split a rendered cue into separately placed text regions in reading order."""
+    rows = [bitmap.pixels[r * bitmap.width:(r + 1) * bitmap.width].translate(INK)
+            for r in range(bitmap.height)]
+    result = []
+    for top, bottom in _runs([1 in row for row in rows], line_bridge):
+        columns = 0
+        for row in rows[top:bottom]:
+            columns |= int.from_bytes(row, 'big')
+        mask = columns.to_bytes(bitmap.width, 'big')
+        # Word gaps are well under a line height; speaker placements are wider apart.
+        for left, right in _runs(mask, bottom - top):
+            width = right - left + 2 * padding
+            canvas = bytearray(b'\xff' * (width * (bottom - top + 2 * padding)))
+            for offset, r in enumerate(range(top, bottom)):
+                start = (offset + padding) * width + padding
+                canvas[start:start + right - left] = bitmap.pixels[r * bitmap.width + left:r * bitmap.width + right]
+            result.append(Bitmap(width, bottom - top + 2 * padding, bytes(canvas)))
+    return result

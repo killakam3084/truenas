@@ -4,7 +4,7 @@ import struct
 import tempfile
 import unittest
 
-from pgs import decode_rle, pgm, render
+from pgs import Bitmap, decode_rle, pgm, regions, render
 from worker import presentations
 
 
@@ -86,6 +86,30 @@ class PgsTests(unittest.TestCase):
         self.assertEqual((bitmap.width, bitmap.height), (5, 4))
         self.assertEqual(bitmap.pixels, bytes([20, 20, 255, 255, 255] + [255] * 10
                                               + [255, 255, 255, 255, 239]))
+
+    def test_splits_lines_and_separately_placed_speakers_in_reading_order(self):
+        width, height = 200, 60
+        pixels = bytearray(b'\xff' * (width * height))
+
+        def ink(x, y, w, h):
+            for row in range(y, y + h):
+                pixels[row * width + x:row * width + x + w] = b'\0' * w
+
+        ink(150, 5, 20, 10)   # right speaker, top line
+        ink(10, 30, 20, 10)   # left speaker, second line: two words with a narrow gap
+        ink(35, 30, 20, 10)
+        ink(10, 45, 30, 10)   # third line, separated from the second by blank rows
+        found = regions(Bitmap(width, height, bytes(pixels)), padding=2, line_bridge=4)
+        self.assertEqual([(r.width, r.height) for r in found], [(24, 14), (49, 14), (34, 14)])
+        self.assertEqual(found[0].pixels[2 * 24 + 2], 0)
+
+    def test_splits_same_line_speakers_separated_by_a_wide_gap(self):
+        width = 120
+        row = [255] * width
+        for x in list(range(5, 15)) + list(range(80, 90)):
+            row[x] = 0
+        found = regions(Bitmap(width, 10, bytes(row * 10)), padding=0)
+        self.assertEqual([(r.width, r.height) for r in found], [(10, 10), (10, 10)])
 
     def test_rejects_malformed_or_unsupported_display_sets(self):
         good = objects(0, [[1, 1]])

@@ -56,12 +56,21 @@ completion. No watcher or downloader integration is installed by this MVP.
 
 PGS display sets are decoded in Python (`pgs.py`) into padded dark-on-white bitmaps
 and recognized by Debian's `libtesseract` through ctypes (`ocr.py`), one engine
-per process, with one process per CPU in the container's quota. Each cue is read
-as a text block; if that yields nothing, it is re-read as a single line, because
-block layout analysis discards isolated narrow glyphs such as a lone "I". Cue
-timing always comes from the source PGS presentations, never from the OCR engine.
+per process, with one process per CPU in the container's quota. Each cue is split
+into text regions (lines, and speaker lines placed apart on the same row) that are
+read one line at a time and joined top to bottom, left to right. Tesseract's own
+block layout analysis was not used because it dropped separately placed speaker
+lines and lone glyphs such as "I". Any region containing ink that yields no text
+withholds the episode, so text is never silently lost. Cue timing always comes from
+the source PGS presentations, never from the OCR engine.
 
-The decoder was verified pixel-identical to FFmpeg's PGS decoder on 4,521 cues.
+Reading order for two speakers placed at different screen positions follows the
+layout (top first), which is not always the order they spoke.
+
+The decoder was verified pixel-identical to FFmpeg's PGS decoder on 4,521 cues. A
+shadow run over 85 already-processed episodes (80,068 cues) passed every gate with
+no unread regions, recovered all four previously withheld episodes, and matched
+prior text on 98.3% of cues, with differences mostly favoring the new engine.
 Image `0.1.0` (PgsToSrt) remains available locally for rollback by changing the
 Compose image tag.
 
@@ -73,9 +82,8 @@ supplied at runtime as shown above. Unspecified identities are recorded as
 
 Per-file staging directories retain MKV metadata, a `result.json` report,
 extracted PGS, normalized PGS, and SRT candidates for inspection. OCR runs also
-retain `ocr.json` (raw and corrected text per cue) and a `cue-NNNN.pgm` image for
-every single-line fallback; fallback cues are listed in the result for playback
-review. Failures retain the processing phase, staging path, and structured
+retain `ocr.json` (raw and corrected text per cue) and a
+`cue-NNNN-region-N.pgm` image for every unread text region. Failures retain the processing phase, staging path, and structured
 validation details, including the cue index and timestamps when applicable. OCR
 results also record the engine version, worker count, and model SHA256. These can
 consume tens of MB per episode; remove reviewed staging directories manually.

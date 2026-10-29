@@ -24,12 +24,10 @@ class WorkerCountTests(unittest.TestCase):
 @unittest.skipUnless(ctypes.util.find_library('tesseract') and ocr.TESSDATA.is_dir(),
                      'requires libtesseract and the bundled model (runs in the image build)')
 class TesseractTests(unittest.TestCase):
-    def test_recovers_lone_capital_i_with_single_line_fallback(self):
+    def test_recovers_lone_capital_i(self):
         engine = ocr.Tesseract()
         self.addCleanup(engine.close)
-        result = engine.recognize(FIXTURE.read_bytes())
-        self.assertEqual((result.text, result.fallback), ('I...', True))
-        self.assertTrue(result.image.startswith(b'P5\n'))
+        self.assertEqual(engine.recognize(FIXTURE.read_bytes()), ('I...', []))
 
     def test_process_pool_preserves_order(self):
         results = ocr.recognize_all([FIXTURE.read_bytes()] * 3, workers=2)
