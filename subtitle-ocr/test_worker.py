@@ -5,7 +5,9 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from worker import ValidationError, correct_ocr, existing_sidecar, main, normalize, presentations, process, publish, runtime_context, select_track, validate
+import ocr
+from worker import (ValidationError, correct_ocr, existing_sidecar, main, normalize, ocr_subtitle,
+                    presentations, process, publish, runtime_context, select_track, validate)
 
 
 def segment(kind, payload, timestamp):
@@ -103,18 +105,48 @@ class WorkerTests(unittest.TestCase):
         self.assertIn('image_id', result['provenance'])
         self.assertEqual(json.loads((self.root / 'work/results.jsonl').read_text()), result)
 
-    def test_corrects_misread_capital_i_without_changing_timing(self):
-        raw = self.root / 'raw.srt'
-        corrected = self.root / 'corrected.srt'
-        raw.write_text('7\n00:00:01,000 --> 00:00:02,000\n'
-                       "| left. l-| BEG, 'l'm |CAN, well before l..\n"
-                       'Lloyd will lull |\n\n')
-        self.assertEqual(correct_ocr(raw, corrected), 7)
-        self.assertEqual(corrected.read_text(), '7\n00:00:01,000 --> 00:00:02,000\n'
-                         "I left. I-I BEG, 'I'm ICAN, well before I..\n"
-                         'Lloyd will lull I\n\n')
-        with self.assertRaises(FileExistsError):
-            correct_ocr(raw, corrected)
+    def test_corrects_misread_capital_i_without_touching_words(self):
+        self.assertEqual(correct_ocr("| left. l-| BEG, 'l'm |CAN, well before l..\nLloyd will lull |"),
+                         ("I left. I-I BEG, 'I'm ICAN, well before I..\nLloyd will lull I", 7))
+
+    def ocr_fixture(self, results):
+        source = self.root / 'source.sup'
+        source.write_bytes(display_set(90000, True) + display_set(180000, False)
+                           + display_set(270000, True) + display_set(360000, False))
+        normalized = self.root / 'normalized.sup'
+        intervals = normalize(source, normalized)
+        tessdata = self.root / 'tessdata'
+        tessdata.mkdir()
+        (tessdata / 'eng.traineddata').write_bytes(b'model')
+        patches = [patch('worker.ocr.TESSDATA', tessdata), patch('worker.ocr.version', return_value='5.3.0'),
+                   patch('worker.ocr.worker_count', return_value=3),
+                   patch('worker.ocr.recognize_all', return_value=results)]
+        for active in patches:
+            active.start()
+            self.addCleanup(active.stop)
+        return normalized, intervals
+
+    def test_ocr_builds_cues_from_source_timing_and_records_fallbacks(self):
+        normalized, intervals = self.ocr_fixture([ocr.Recognition('| left\nearly.', False, None),
+                                                  ocr.Recognition('|...', True, b'P5 image')])
+        details = {}
+        text = ocr_subtitle(normalized, intervals, self.root, details)
+        self.assertEqual(text, '1\n00:00:01,000 --> 00:00:02,000\nI left\nearly.\n\n'
+                               '2\n00:00:03,000 --> 00:00:04,000\nI...\n\n')
+        self.assertEqual(details['ocr_fallbacks'], [{'cue': 2, 'start_ms': 3000.0, 'text': 'I...'}])
+        self.assertEqual((details['ocr_corrections'], details['ocr_workers']), (2, 3))
+        self.assertEqual(details['ocr_engine'], 'tesseract 5.3.0')
+        self.assertEqual((self.root / 'cue-0002.pgm').read_bytes(), b'P5 image')
+        self.assertEqual(json.loads((self.root / 'ocr.json').read_text())[0]['raw'], '| left\nearly.')
+
+    def test_ocr_rejects_unrecovered_empty_cue_after_reporting(self):
+        normalized, intervals = self.ocr_fixture([ocr.Recognition('Hello', False, None),
+                                                  ocr.Recognition('', True, b'P5 image')])
+        with self.assertRaises(ValidationError) as failure:
+            ocr_subtitle(normalized, intervals, self.root, {})
+        self.assertEqual((failure.exception.details['cue_index'], failure.exception.details['start_ms']),
+                         (2, 3000.0))
+        self.assertEqual(len(json.loads((self.root / 'ocr.json').read_text())), 2)
 
     def test_runtime_context_records_deployment_identity(self):
         environment = {'SUBTITLE_IMAGE_ID': 'sha256:test-image',

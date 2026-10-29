@@ -1,6 +1,6 @@
 services:
   subtitle-ocr:
-    image: truenas/subtitle-ocr:0.1.0
+    image: truenas/subtitle-ocr:0.2.0
     build:
       context: .
       args:
@@ -17,7 +17,7 @@ services:
     mem_limit: ${SUBTITLE_MEMORY:-1g}
     pids_limit: 128
     environment:
-      OMP_THREAD_LIMIT: ${SUBTITLE_OCR_THREADS:-2}
+      OMP_THREAD_LIMIT: ${SUBTITLE_OCR_THREADS:-1}
       SUBTITLE_IMAGE_ID: ${SUBTITLE_IMAGE_ID:-unknown}
     tmpfs:
       - /tmp:rw,nosuid,nodev,size=256m

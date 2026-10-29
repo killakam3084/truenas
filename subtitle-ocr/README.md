@@ -49,8 +49,21 @@ completion. No watcher or downloader integration is installed by this MVP.
 - Inherited dataset ACLs are preserved; no chmod, chown, or dataset ACL changes.
 - One batch per work directory is enforced using a lock. Failures are logged and
   processing continues; any failure produces a nonzero final exit status.
-- The image pins PgsToSrt by digest and verifies the English OCR model checksum.
+- The image pins its Debian base by digest and verifies the English OCR model checksum.
   Python and system extraction packages are installed at image build time.
+
+## OCR Engine
+
+PGS display sets are decoded in Python (`pgs.py`) into padded dark-on-white bitmaps
+and recognized by Debian's `libtesseract` through ctypes (`ocr.py`), one engine
+per process, with one process per CPU in the container's quota. Each cue is read
+as a text block; if that yields nothing, it is re-read as a single line, because
+block layout analysis discards isolated narrow glyphs such as a lone "I". Cue
+timing always comes from the source PGS presentations, never from the OCR engine.
+
+The decoder was verified pixel-identical to FFmpeg's PGS decoder on 4,521 cues.
+Image `0.1.0` (PgsToSrt) remains available locally for rollback by changing the
+Compose image tag.
 
 `/work/results.jsonl` contains per-file outcomes, grouped by run ID, with deployed
 revision, supplied image ID, OCR thread limit, and available cgroup CPU/memory
@@ -59,10 +72,12 @@ supplied at runtime as shown above. Unspecified identities are recorded as
 `unknown`; no Docker socket is required.
 
 Per-file staging directories retain MKV metadata, a `result.json` report,
-extracted PGS, normalized PGS, and SRT candidates for inspection. Failures retain
-the processing phase, staging path, and structured validation details, including
-the cue index and timestamps when applicable. OCR results also record the model
-SHA256. These can
+extracted PGS, normalized PGS, and SRT candidates for inspection. OCR runs also
+retain `ocr.json` (raw and corrected text per cue) and a `cue-NNNN.pgm` image for
+every single-line fallback; fallback cues are listed in the result for playback
+review. Failures retain the processing phase, staging path, and structured
+validation details, including the cue index and timestamps when applicable. OCR
+results also record the engine version, worker count, and model SHA256. These can
 consume tens of MB per episode; remove reviewed staging directories manually.
 Reruns skip published sidecars. Nothing rescans Plex automatically; use a library
 scan if Plex has not detected the external English SRT.
@@ -75,17 +90,19 @@ python3 -m venv /tmp/subtitle-ocr-venv
 /tmp/subtitle-ocr-venv/bin/python -m unittest discover -s subtitle-ocr -v
 ```
 
-The image build also runs the unit tests. Runtime defaults to two CPU cores and
+The image build also runs the unit tests, including real-engine tests that are
+skipped on hosts without `libtesseract`. Runtime defaults to two CPU cores and
 1 GB memory. Override `SUBTITLE_CPUS`, `SUBTITLE_MEMORY`, and
-`SUBTITLE_OCR_THREADS` (Tesseract's per-engine OpenMP limit, default 2) when
-invoking Compose. The converter also processes cues in parallel, so raising the
-OpenMP limit is not the same as assigning more CPUs and can oversubscribe them.
+`SUBTITLE_OCR_THREADS` (Tesseract's per-engine OpenMP limit, default 1) when
+invoking Compose. Parallelism comes from one OCR process per CPU, so raising the
+OpenMP limit oversubscribes the quota.
 Network downloads happen during build only. This is an on-demand MVP, not an
 automatic acquisition or release pipeline.
 
 ## NAS Benchmark
 
-Single-run comparison on the dual Xeon E5-2680 v4 NAS (28 physical cores, 56 logical
+Measured with image `0.1.0` (PgsToSrt). Single-run comparison on the dual Xeon
+E5-2680 v4 NAS (28 physical cores, 56 logical
 CPUs), using the same 932-cue episode 4 normalized PGS stream, 2 GiB memory, and
 `SUBTITLE_OCR_THREADS=2`:
 
@@ -129,10 +146,11 @@ Run one episode at a time with 16 CPUs and 4 GiB memory:
 | 4 | 21 of 22 (E01-E02 is one file) | E13, cue 633 | 23.7 seconds |
 
 Tesseract reads this subtitle font's capital I as `|` or a standalone `l`. OCR
-output is now corrected for those glyphs only, retaining the raw result as
-`ocr.raw.srt`; cue numbering and timing are unchanged and still validated. Sidecars
+output is now corrected for those glyphs only, retaining the raw result in staging;
+cue numbering and timing are unchanged and still validated. Sidecars
 published before this correction were rewritten once after verifying each still
 matched its staged original; originals remain in their staging directories.
 
-Four episodes across seasons 1-4 have each failed on one empty OCR cue. They remain
-unpublished pending review of the source images.
+Four episodes across seasons 1-4 each failed on one empty OCR cue: a lone "I..."
+that PgsToSrt could not read. They remain unpublished pending the image `0.2.0`
+shadow run.

@@ -3,6 +3,9 @@
 ## [Unreleased]
 
 ### Added
+- In-process OCR engine (image 0.2.0): Python PGS decoder plus Debian `libtesseract`
+  via ctypes, one process per CPU, with single-line fallback for empty cues. Replaces
+  PgsToSrt and the .NET runtime; per-cue OCR reports and fallback images in staging.
 - Run IDs, image/revision/model provenance, retained per-file metadata and failure
   reports, and structured cue-level validation diagnostics.
 - Containerized, offline English SRT extraction and PGS OCR for completed MKVs.

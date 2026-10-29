@@ -1,4 +1,5 @@
 import argparse
+from datetime import timedelta
 import fcntl
 import hashlib
 import json
@@ -13,6 +14,8 @@ import time
 import uuid
 
 import srt
+
+import ocr
 
 
 class ValidationError(ValueError):
@@ -37,15 +40,38 @@ def runtime_context():
 MISREAD_I = re.compile(r'\||(?<![A-Za-z])l(?![A-Za-z])')
 
 
-def correct_ocr(source, destination):
-    cues = list(srt.parse(source.read_text(encoding='utf-8-sig')))
-    corrections = 0
-    for cue in cues:
-        cue.content, count = MISREAD_I.subn('I', cue.content)
+def correct_ocr(text):
+    return MISREAD_I.subn('I', text)
+
+
+def ocr_subtitle(normalized, intervals, staging, details):
+    shown = [data for _, data, visible in presentations(normalized) if visible]
+    if len(shown) != len(intervals):
+        raise ValueError('PGS presentations differ from cue intervals')
+    model = ocr.TESSDATA / 'eng.traineddata'
+    workers = ocr.worker_count()
+    details.update(phase='ocr', expected_cues=len(intervals), ocr_engine=f'tesseract {ocr.version()}',
+                   ocr_workers=workers, model_sha256=hashlib.sha256(model.read_bytes()).hexdigest())
+    results = ocr.recognize_all(shown, workers)
+    cues, report, fallbacks, corrections = [], [], [], 0
+    for position, ((start, end), result) in enumerate(zip(intervals, results), 1):
+        text, count = correct_ocr(result.text)
         corrections += count
-    with destination.open('x', encoding='utf-8') as output:
-        output.write(srt.compose(cues, reindex=False))
-    return corrections
+        report.append({'cue': position, 'start_ms': start, 'end_ms': end, 'raw': result.text,
+                       'text': text, 'fallback': result.fallback})
+        if result.fallback:
+            (staging / f'cue-{position:04d}.pgm').write_bytes(result.image)
+            fallbacks.append({'cue': position, 'start_ms': start, 'text': text})
+        cues.append(srt.Subtitle(position, timedelta(milliseconds=start), timedelta(milliseconds=end), text))
+    (staging / 'ocr.json').write_text(json.dumps(report, indent=1) + '\n')
+    details.update(ocr_corrections=corrections, ocr_fallbacks=fallbacks)
+    for cue in cues:
+        if not cue.content:
+            start = cue.start.total_seconds() * 1000
+            raise ValidationError(f'Invalid cue number/content at {cue.index}', position=cue.index,
+                                  cue_index=cue.index, start_ms=start,
+                                  end_ms=cue.end.total_seconds() * 1000, empty_content=True)
+    return srt.compose(cues, reindex=False)
 
 
 def presentations(path):
@@ -224,14 +250,9 @@ def process(video, work, min_age, dry_run, details=None):
         subprocess.run(['mkvextract', str(video), 'tracks', f'{track["id"]}:{extracted}'], check=True)
         details['phase'] = 'normalization'
         intervals = normalize(extracted, normalized)
-        model = Path('/opt/subtitle-ocr/tessdata/eng.traineddata')
-        details.update(phase='ocr', expected_cues=len(intervals),
-                       model_sha256=hashlib.sha256(model.read_bytes()).hexdigest())
-        raw = staging / 'ocr.raw.srt'
-        subprocess.run(['dotnet', '/app/PgsToSrt.dll', '--input', str(normalized),
-                        '--output', str(raw), '--tesseractdata', '/opt/subtitle-ocr/tessdata',
-                        '--tesseractlanguage', 'eng', '--tesseractversion', '5'], check=True)
-        details.update(phase='correction', ocr_corrections=correct_ocr(raw, candidate))
+        text = ocr_subtitle(normalized, intervals, staging, details)
+        with candidate.open('x', encoding='utf-8') as output:
+            output.write(text)
         method = 'pgs-ocr'
     details.update(phase='validation', method=method)
     count = validate(candidate, duration_ms, intervals)
