@@ -166,5 +166,15 @@ published before this correction were rewritten once after verifying each still
 matched its staged original; originals remain in their staging directories.
 
 Four episodes across seasons 1-4 each failed on one empty OCR cue: a lone "I..."
-that PgsToSrt could not read. They remain unpublished pending the image `0.2.0`
-shadow run.
+that PgsToSrt could not read. Image `0.2.0` recovered and published all four, and
+regenerated every earlier PgsToSrt sidecar (82, hash-verified, backups retained).
+
+## Seasons 5-7 Intake Results
+
+Image `0.2.0`, 16 CPUs and 4 GiB, one episode at a time: 66 of 66 episodes published
+with no failures or withheld cues, 9.7 seconds median per full intake, 10.6 minutes
+total. Every West Wing episode on disk now has a validated English sidecar.
+
+A follow-up `--replace-own` run over season 5 reported all 22 sidecars `unchanged`
+(deterministic output, files untouched), and correctly skipped the manually produced
+pilot sidecar as not produced by this tool.
