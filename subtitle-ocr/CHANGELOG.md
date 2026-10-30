@@ -3,6 +3,8 @@
 ## [Unreleased]
 
 ### Added
+- `--replace-own` to regenerate only sidecars this tool produced (hash-proven), with
+  backup and atomic replacement; published results now record the sidecar `sha256`.
 - In-process OCR engine (image 0.2.0): Python PGS decoder plus Debian `libtesseract`
   via ctypes, one process per CPU. Cues are split into line/speaker regions read
   individually; any unread region withholds the episode. Replaces PgsToSrt and the

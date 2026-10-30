@@ -6,8 +6,8 @@ import unittest
 from unittest.mock import patch
 
 import ocr
-from worker import (ValidationError, correct_ocr, existing_sidecar, main, normalize, ocr_subtitle,
-                    presentations, process, publish, runtime_context, select_track, validate)
+from worker import (ValidationError, correct_ocr, digest, existing_sidecar, main, normalize, ocr_subtitle,
+                    owned_hashes, presentations, process, publish, runtime_context, select_track, validate)
 
 
 def segment(kind, payload, timestamp):
@@ -91,7 +91,7 @@ class WorkerTests(unittest.TestCase):
         staging = self.root / 'staging'
         staging.mkdir()
 
-        def fail(source, work, min_age, dry_run, details):
+        def fail(source, work, min_age, dry_run, details, owned=None):
             details.update(staging=str(staging), phase='validation')
             raise ValidationError('Empty cue', cue_index=941, start_ms=1000)
 
@@ -194,6 +194,64 @@ class WorkerTests(unittest.TestCase):
             self.assertEqual(main(), 0)
             self.assertEqual(process_file.call_count, 1)
             self.assertEqual(process_file.call_args.args[0], video)
+
+    def text_track_video(self, subtitle='1\n00:00:01,000 --> 00:00:02,000\nHello\n\n'):
+        video = self.root / 'video.mkv'
+        video.write_bytes(b'\x1a\x45\xdf\xa3')
+        metadata = {'container': {'properties': {'duration': 3_000_000_000}},
+                    'tracks': [{'id': 2, 'type': 'subtitles', 'properties': {
+                        'language': 'eng', 'codec_id': 'S_TEXT/UTF8'}}]}
+
+        def extract(command, check):
+            Path(command[-1].split(':', 1)[1]).write_text(subtitle)
+
+        for active in (patch('worker.subprocess.check_output', return_value=json.dumps(metadata)),
+                       patch('worker.subprocess.run', side_effect=extract)):
+            active.start()
+            self.addCleanup(active.stop)
+        return video
+
+    def test_replace_own_regenerates_owned_sidecar_with_backup(self):
+        video = self.text_track_video()
+        sidecar = video.with_suffix('.en.srt')
+        sidecar.write_text('1\n00:00:01,000 --> 00:00:02,000\nHel1o\n\n')
+        result = process(video, self.root, 0, False, {}, owned={digest(sidecar)})
+        self.assertEqual(result['status'], 'replaced')
+        self.assertEqual(sidecar.read_text(), '1\n00:00:01,000 --> 00:00:02,000\nHello\n\n')
+        self.assertEqual(result['sha256'], digest(sidecar))
+        self.assertIn('Hel1o', (Path(result['staging']) / 'previous.en.srt').read_text())
+        self.assertEqual(list(self.root.glob('.subtitle-ocr-*')), [])
+
+    def test_replace_own_never_touches_other_sidecars(self):
+        video = self.text_track_video()
+        for name in ('video.en.srt', 'video.srt'):
+            with self.subTest(name):
+                for path in self.root.glob('video*.srt'):
+                    path.unlink()
+                sidecar = self.root / name
+                sidecar.write_text('someone else')
+                owned = set() if name == 'video.en.srt' else {digest(sidecar)}
+                result = process(video, self.root, 0, False, {}, owned=owned)
+                self.assertEqual(result['reason'], 'existing sidecar not produced by this tool')
+                self.assertEqual(sidecar.read_text(), 'someone else')
+
+    def test_replace_own_leaves_identical_output_unchanged(self):
+        video = self.text_track_video()
+        sidecar = video.with_suffix('.en.srt')
+        sidecar.write_text('1\n00:00:01,000 --> 00:00:02,000\nHello\n\n')
+        before = sidecar.stat().st_ino
+        result = process(video, self.root, 0, False, {}, owned={digest(sidecar)})
+        self.assertEqual(result['status'], 'unchanged')
+        self.assertEqual(sidecar.stat().st_ino, before)
+
+    def test_owned_hashes_come_from_reports_and_staging(self):
+        (self.root / 'results.jsonl').write_text(json.dumps({'sha256': 'abc'}) + '\n' + json.dumps({}) + '\n')
+        staging = self.root / 'episode-x'
+        staging.mkdir()
+        (staging / 'subtitle.en.srt').write_text('one')
+        (staging / 'subtitle.en.corrected.srt').write_text('two')
+        self.assertEqual(owned_hashes(self.root), {'abc', digest(staging / 'subtitle.en.srt'),
+                                                   digest(staging / 'subtitle.en.corrected.srt')})
 
     def test_changed_source_is_not_published(self):
         video = self.root / 'video.mkv'

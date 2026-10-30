@@ -198,7 +198,7 @@ def existing_sidecar(video):
     return None
 
 
-def publish(source, destination):
+def publish(source, destination, replace=False):
     temporary = destination.parent / f'.subtitle-ocr-{uuid.uuid4().hex}.tmp'
     try:
         descriptor = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o666)
@@ -206,9 +206,29 @@ def publish(source, destination):
             shutil.copyfileobj(input_file, output)
             output.flush()
             os.fsync(output.fileno())
-        os.link(temporary, destination)
+        if replace:
+            os.replace(temporary, destination)
+        else:
+            os.link(temporary, destination)
     finally:
         temporary.unlink(missing_ok=True)
+
+
+def digest(path):
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def owned_hashes(work):
+    """Hashes of every sidecar this tool has produced, from reports and retained staging."""
+    owned = set()
+    results = work / 'results.jsonl'
+    if results.is_file():
+        with results.open() as lines:
+            owned.update(json.loads(line).get('sha256') for line in lines)
+    for name in ('subtitle.en.srt', 'subtitle.en.corrected.srt'):
+        owned.update(digest(path) for path in work.glob(f'*/{name}'))
+    owned.discard(None)
+    return owned
 
 
 def fingerprint(path):
@@ -216,15 +236,22 @@ def fingerprint(path):
     return details.st_dev, details.st_ino, details.st_size, details.st_mtime_ns
 
 
-def process(video, work, min_age, dry_run, details=None):
+def process(video, work, min_age, dry_run, details=None, owned=None):
     if details is None:
         details = {}
     details['phase'] = 'inspection'
     if video.suffix.lower() != '.mkv' or video.is_symlink() or not video.is_file():
         raise ValueError('Input must be a regular non-symlink file')
+    destination = video.with_suffix('.en.srt')
     sidecar = existing_sidecar(video)
+    replacing = None
     if sidecar:
-        return {'status': 'skipped', 'reason': 'existing sidecar', 'subtitle': str(sidecar)}
+        if (owned is None or sidecar != destination or sidecar.is_symlink()
+                or digest(sidecar) not in owned):
+            reason = 'existing sidecar' if owned is None else 'existing sidecar not produced by this tool'
+            return {'status': 'skipped', 'reason': reason, 'subtitle': str(sidecar)}
+        replacing = digest(sidecar)
+        details['replacing_sha256'] = replacing
     before = fingerprint(video)
     if time.time() - video.stat().st_mtime < min_age:
         raise ValueError('Input is too recent; wait for downloading/moving to finish')
@@ -236,7 +263,8 @@ def process(video, work, min_age, dry_run, details=None):
     duration_ms = metadata['container']['properties']['duration'] / 1_000_000
     details.update(track=track, duration_ms=duration_ms, source_fingerprint=list(before))
     if dry_run:
-        return {'status': 'planned', 'track': track['id'], 'codec': track['properties']['codec_id']}
+        return {'status': 'planned', 'track': track['id'], 'codec': track['properties']['codec_id'],
+                'replace': replacing is not None}
     staging = Path(tempfile.mkdtemp(prefix=f'{video.stem[:30]}-', dir=work))
     candidate = staging / 'subtitle.en.srt'
     details.update(staging=str(staging), candidate=str(candidate), phase='extraction')
@@ -259,15 +287,23 @@ def process(video, work, min_age, dry_run, details=None):
     count = validate(candidate, duration_ms, intervals)
     if fingerprint(video) != before:
         raise ValueError('Source changed during processing; refusing publication')
-    if existing_sidecar(video):
+    current = existing_sidecar(video)
+    sha256 = digest(candidate)
+    if replacing is None and current:
         return {'status': 'skipped', 'reason': 'sidecar appeared during processing'}
-    destination = video.with_suffix('.en.srt')
+    if replacing is not None:
+        if current != destination or digest(destination) != replacing:
+            return {'status': 'skipped', 'reason': 'sidecar changed during processing'}
+        if sha256 == replacing:
+            return {'status': 'unchanged', 'method': method, 'cues': count, 'sha256': sha256,
+                    'subtitle': str(destination), 'staging': str(staging)}
+        shutil.copyfile(destination, staging / 'previous.en.srt')
     details['phase'] = 'publication'
-    publish(candidate, destination)
+    publish(candidate, destination, replace=replacing is not None)
     if candidate.read_bytes() != destination.read_bytes():
         raise ValueError('Published subtitle differs from validated output')
-    return {'status': 'published', 'method': method, 'cues': count,
-            'subtitle': str(destination), 'staging': str(staging)}
+    return {'status': 'replaced' if replacing else 'published', 'method': method, 'cues': count,
+            'sha256': sha256, 'subtitle': str(destination), 'staging': str(staging)}
 
 
 def main():
@@ -278,6 +314,8 @@ def main():
     parser.add_argument('--work', type=Path, default=Path('/work'))
     parser.add_argument('--min-age', type=int, default=300)
     parser.add_argument('--dry-run', action='store_true')
+    parser.add_argument('--replace-own', action='store_true',
+                        help='regenerate .en.srt sidecars whose bytes match an earlier output of this tool')
     arguments = parser.parse_args()
     arguments.work.mkdir(parents=True, exist_ok=True)
     videos = set()
@@ -294,12 +332,13 @@ def main():
     run_id = uuid.uuid4().hex
     with (arguments.work / 'worker.lock').open('a') as lock:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        owned = owned_hashes(arguments.work) if arguments.replace_own else None
         for video in sorted(videos, key=lambda path: (arguments.priority not in path.name, str(path))):
             print(f'PROCESSING {video}', flush=True)
             started = time.perf_counter()
             details = {'run_id': run_id, 'provenance': provenance}
             try:
-                result = process(video, arguments.work, arguments.min_age, arguments.dry_run, details)
+                result = process(video, arguments.work, arguments.min_age, arguments.dry_run, details, owned)
             except Exception as error:
                 failed = True
                 result = {'status': 'failed', 'error': str(error),

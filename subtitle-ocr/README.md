@@ -34,6 +34,12 @@ completion. No watcher or downloader integration is installed by this MVP.
 
 - Existing bare, English, and English SDH/HI/CC SRT sidecars are skipped, including
   symlinks. Embedded forced tracks are not substituted for full dialogue tracks.
+- `--replace-own` regenerates an existing `.en.srt` only if its exact bytes match an
+  earlier output of this tool (a `sha256` in `results.jsonl` or a retained staging
+  candidate). Any other sidecar is still skipped. The previous file is kept as
+  `previous.en.srt` in the new staging directory and swapped atomically; identical
+  output is reported as `unchanged` and the file is not touched. Keep staging
+  directories if you want older outputs to remain replaceable.
 - Supported inputs are English `S_TEXT/UTF8` and `S_HDMV/PGS`. Other formats and
   missing subtitles are reported as failures; there is no audio transcription.
 - MKVToolNix extracts tracks. Complete, self-contained PGS display sets are sorted
