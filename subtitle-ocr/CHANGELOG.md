@@ -27,6 +27,8 @@
   per-episode staging from ~40 MB to well under 1 MB.
 
 ### Fixed
+- Prefer a full-dialogue track over a busier hearing-impaired (SDH) one; SDH tracks
+  are often broadcast captions that trail the audio.
 - Choose the English track with the most events instead of the default flag, and
   withhold foreign-parts-sized results (The Boys published 2-25 cue sidecars).
 - Ignore redundant PGS clear events instead of rejecting the stream.

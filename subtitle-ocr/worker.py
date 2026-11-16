@@ -327,12 +327,15 @@ def process(video, work, min_age, dry_run, details=None, owned=None):
     subprocess.run(['mkvextract', str(video), 'tracks', *[f'{key}:{path}' for key, path in paths.items()]],
                    check=True)
     counts = {key: event_count(path, codec) for key, path in paths.items()}
-    track = max(tracks, key=lambda option: counts[option['id']])
+    minutes = duration_ms / 60000
+    # SDH tracks are often broadcast captions that lag the audio; prefer full plain dialogue.
+    track = max(tracks, key=lambda option: (counts[option['id']] >= MIN_CUES_PER_MINUTE * minutes,
+                                            not option['properties'].get('flag_hearing_impaired', False),
+                                            counts[option['id']]))
     details.update(track=track, track_candidates=[{'id': key, 'events': value} for key, value in counts.items()])
     for key, path in paths.items():
         if key != track['id']:
             path.unlink(missing_ok=True)
-    minutes = duration_ms / 60000
     if counts[track['id']] < MIN_CUES_PER_MINUTE * minutes:
         raise ValidationError('English track too sparse for full dialogue (likely foreign parts only)',
                               events=counts[track['id']], minutes=round(minutes, 1),

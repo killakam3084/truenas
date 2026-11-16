@@ -338,12 +338,13 @@ class WorkerTests(unittest.TestCase):
                 process(video, self.root, 0, False)
         self.assertFalse(video.with_suffix('.en.srt').exists())
 
-    def untagged_text_video(self, texts, extra_tracks=()):
+    def untagged_text_video(self, texts, extra_tracks=(), sdh=()):
         video = self.root / 'video.mkv'
         video.write_bytes(b'\x1a\x45\xdf\xa3')
         metadata = {'container': {'properties': {'duration': 60_000_000_000}},
                     'tracks': [{'id': key, 'type': 'subtitles', 'properties': {
-                        'language': 'und', 'codec_id': 'S_TEXT/UTF8', 'default_track': key == 2}}
+                        'language': 'und', 'codec_id': 'S_TEXT/UTF8', 'default_track': key == 2,
+                        'flag_hearing_impaired': key in sdh}}
                         for key in texts] + list(extra_tracks)}
 
         def extract(command, check):
@@ -377,6 +378,20 @@ class WorkerTests(unittest.TestCase):
         metadata = {'tracks': [{'id': 2, 'type': 'subtitles', 'properties': {
             'language': 'und', 'codec_id': 'S_TEXT/UTF8'}}, tagged]}
         self.assertEqual(select_track(metadata)['id'], 4)
+
+    def test_prefers_full_plain_dialogue_over_busier_sdh_track(self):
+        plain = ['WELCOME TO THE SHOW.', 'AND THAT IS WHAT WE HAVE.'] * 2
+        video = self.untagged_text_video({2: plain, 3: ['♪ ♪'] + plain}, sdh={3})
+        details = {}
+        process(video, self.root, 0, False, details)
+        self.assertEqual(details['track']['id'], 2)
+
+    def test_sdh_track_used_when_plain_track_is_sparse(self):
+        video = self.untagged_text_video({2: ['WELCOME TO THE SHOW.'],
+                                          3: ['WELCOME TO THE SHOW.', 'AND THAT IS WHAT WE HAVE.'] * 2}, sdh={3})
+        details = {}
+        process(video, self.root, 0, False, details)
+        self.assertEqual(details['track']['id'], 3)
 
 
 if __name__ == '__main__':
