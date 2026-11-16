@@ -91,9 +91,11 @@ extracted PGS, normalized PGS, and SRT candidates for inspection. OCR runs also
 retain `ocr.json` (raw and corrected text per cue) and a
 `cue-NNNN-region-N.pgm` image for every unread text region. Failures retain the processing phase, staging path, and structured
 validation details, including the cue index and timestamps when applicable. OCR
-results also record the engine version, worker count, and model SHA256. These can
-consume tens of MB per episode; remove reviewed staging directories manually.
-Reruns skip published sidecars. Nothing rescans Plex automatically; use a library
+results also record the engine version, worker count, and model SHA256. Extracted
+and normalized PGS copies (tens of MB per episode) are deleted after a successful
+intake and kept only on failure; they can always be re-extracted from the MKV.
+Remaining staging is small text and is what `--replace-own` uses to prove
+ownership, so keep it. Reruns skip published sidecars. Nothing rescans Plex automatically; use a library
 scan if Plex has not detected the external English SRT.
 
 ## Tests

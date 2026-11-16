@@ -19,6 +19,10 @@
 - Documented season intake results: 19 validated publications, one safely withheld
   OCR failure, and a 38.2-second median full-workflow time at 8 CPUs.
 
+### Changed
+- Delete staged PGS copies after successful intake (kept on failure), cutting
+  per-episode staging from ~40 MB to well under 1 MB.
+
 ### Fixed
 - Limit directory glob matches to MKVs so newly created sidecars never become inputs.
 - Correct capital I misread by OCR as `|` or a standalone `l`, retaining raw OCR output.

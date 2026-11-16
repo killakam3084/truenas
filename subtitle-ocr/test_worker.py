@@ -253,6 +253,41 @@ class WorkerTests(unittest.TestCase):
         self.assertEqual(owned_hashes(self.root), {'abc', digest(staging / 'subtitle.en.srt'),
                                                    digest(staging / 'subtitle.en.corrected.srt')})
 
+    def pgs_video(self, results):
+        self.ocr_fixture(results)
+        video = self.root / 'video.mkv'
+        video.write_bytes(b'\x1a\x45\xdf\xa3')
+        metadata = {'container': {'properties': {'duration': 5_000_000_000}},
+                    'tracks': [{'id': 2, 'type': 'subtitles', 'properties': {
+                        'language': 'eng', 'codec_id': 'S_HDMV/PGS'}}]}
+        stream = (display_set(90000, True) + display_set(180000, False)
+                  + display_set(270000, True) + display_set(360000, False))
+
+        def extract(command, check):
+            Path(command[-1].split(':', 1)[1]).write_bytes(stream)
+
+        for active in (patch('worker.subprocess.check_output', return_value=json.dumps(metadata)),
+                       patch('worker.subprocess.run', side_effect=extract)):
+            active.start()
+            self.addCleanup(active.stop)
+        return video
+
+    def test_successful_ocr_prunes_pgs_copies_but_keeps_text(self):
+        video = self.pgs_video([ocr.Recognition('Hello', []), ocr.Recognition('There', [])])
+        result = process(video, self.root, 0, False, {})
+        staging = Path(result['staging'])
+        self.assertEqual(result['status'], 'published')
+        self.assertEqual(sorted(path.name for path in staging.glob('*.sup')), [])
+        self.assertTrue((staging / 'subtitle.en.srt').is_file() and (staging / 'ocr.json').is_file())
+
+    def test_failed_ocr_keeps_pgs_copies_for_diagnosis(self):
+        video = self.pgs_video([ocr.Recognition('Hello', []), ocr.Recognition('', [b'P5 image'])])
+        details = {}
+        with self.assertRaises(ValidationError):
+            process(video, self.root, 0, False, details)
+        self.assertEqual(sorted(path.name for path in Path(details['staging']).glob('*.sup')),
+                         ['normalized.sup', 'original.sup'])
+
     def test_changed_source_is_not_published(self):
         video = self.root / 'video.mkv'
         video.write_bytes(b'\x1a\x45\xdf\xa3')

@@ -236,6 +236,12 @@ def fingerprint(path):
     return details.st_dev, details.st_ino, details.st_size, details.st_mtime_ns
 
 
+def prune(staging):
+    # Re-extractable from the MKV; retained only when an intake fails.
+    for name in ('original.sup', 'normalized.sup'):
+        (staging / name).unlink(missing_ok=True)
+
+
 def process(video, work, min_age, dry_run, details=None, owned=None):
     if details is None:
         details = {}
@@ -295,6 +301,7 @@ def process(video, work, min_age, dry_run, details=None, owned=None):
         if current != destination or digest(destination) != replacing:
             return {'status': 'skipped', 'reason': 'sidecar changed during processing'}
         if sha256 == replacing:
+            prune(staging)
             return {'status': 'unchanged', 'method': method, 'cues': count, 'sha256': sha256,
                     'subtitle': str(destination), 'staging': str(staging)}
         shutil.copyfile(destination, staging / 'previous.en.srt')
@@ -302,6 +309,7 @@ def process(video, work, min_age, dry_run, details=None, owned=None):
     publish(candidate, destination, replace=replacing is not None)
     if candidate.read_bytes() != destination.read_bytes():
         raise ValueError('Published subtitle differs from validated output')
+    prune(staging)
     return {'status': 'replaced' if replacing else 'published', 'method': method, 'cues': count,
             'sha256': sha256, 'subtitle': str(destination), 'staging': str(staging)}
 
