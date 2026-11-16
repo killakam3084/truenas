@@ -3,6 +3,7 @@ services:
     image: truenas/subtitle-ocr:0.2.0
     build:
       context: .
+      target: ocr
       args:
         SUBTITLE_REVISION: ${SUBTITLE_REVISION:-unknown}
     user: "950:950"
@@ -21,6 +22,44 @@ services:
       SUBTITLE_IMAGE_ID: ${SUBTITLE_IMAGE_ID:-unknown}
     tmpfs:
       - /tmp:rw,nosuid,nodev,size=256m
+    volumes:
+      - type: bind
+        source: ${SUBTITLE_MEDIA_DIR:?Set SUBTITLE_MEDIA_DIR to a completed media directory}
+        target: /media
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${SUBTITLE_WORK_DIR:-/mnt/cell_block_d/apps/subtitle-ocr/work}
+        target: /work
+        bind:
+          create_host_path: false
+
+  subtitle-fetch:
+    image: truenas/subtitle-fetch:0.1.0
+    build:
+      context: .
+      target: fetch
+      args:
+        SUBTITLE_REVISION: ${SUBTITLE_REVISION:-unknown}
+    user: "950:950"
+    restart: "no"
+    # Host network reaches Infisical on loopback; the public name is not reachable from the NAS.
+    network_mode: host
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    cpus: ${SUBTITLE_CPUS:-4}
+    mem_limit: ${SUBTITLE_MEMORY:-2g}
+    pids_limit: 128
+    env_file:
+      - ${SUBTITLE_SECRETS_ENV:-/mnt/cell_block_d/apps/subtitle-ocr/.env}
+    environment:
+      INFISICAL_DOMAIN: http://127.0.0.1:9090
+      SUBTITLE_IMAGE_ID: ${SUBTITLE_IMAGE_ID:-unknown}
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,size=512m
     volumes:
       - type: bind
         source: ${SUBTITLE_MEDIA_DIR:?Set SUBTITLE_MEDIA_DIR to a completed media directory}
