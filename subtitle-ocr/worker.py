@@ -120,7 +120,10 @@ def normalize(source, destination):
                 raise ValueError('Overlapping or dependent PGS presentations')
             active = timestamp
         else:
-            if active is None or timestamp <= active:
+            if active is None:
+                # A redundant clear (nothing on screen) changes no cue timing.
+                continue
+            if timestamp <= active:
                 raise ValueError('Invalid PGS show/clear ordering')
             intervals.append((active / 90, timestamp / 90))
             active = None

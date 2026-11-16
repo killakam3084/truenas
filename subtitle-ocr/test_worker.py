@@ -47,6 +47,15 @@ class WorkerTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             normalize(source, self.root / 'invalid.sup')
 
+    def test_redundant_clears_are_ignored_but_simultaneous_clear_is_not(self):
+        source = self.root / 'source.sup'
+        source.write_bytes(display_set(45000, False) + display_set(90000, True) + display_set(180000, False)
+                           + display_set(200000, False) + display_set(270000, True) + display_set(360000, False))
+        self.assertEqual(normalize(source, self.root / 'sorted.sup'), [(1000, 2000), (3000, 4000)])
+        source.write_bytes(display_set(90000, True) + display_set(90000, False))
+        with self.assertRaises(ValueError):
+            normalize(source, self.root / 'invalid.sup')
+
     def test_rejects_palette_dependencies(self):
         source = self.root / 'source.sup'
         source.write_bytes(segment(0x16, b'\0' * 10 + b'\1', 90000) + segment(0x80, b'', 90000))
