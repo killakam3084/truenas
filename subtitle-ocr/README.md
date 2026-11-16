@@ -42,6 +42,10 @@ completion. No watcher or downloader integration is installed by this MVP.
   directories if you want older outputs to remain replaceable.
 - Supported inputs are English `S_TEXT/UTF8` and `S_HDMV/PGS`. Other formats and
   missing subtitles are reported as failures; there is no audio transcription.
+- All usable English tracks of the preferred codec are extracted in one pass and the
+  one with the most subtitle events is used, because foreign-parts-only tracks are
+  often left unflagged and even marked default. If the best track still has under
+  2 cues per minute, the episode is withheld; per-track counts are in the result.
 - MKVToolNix extracts tracks. Complete, self-contained PGS display sets are sorted
   by their existing presentation timestamps without changing their bytes. Streams
   with palette/object dependencies or ambiguous show/clear ordering are rejected.

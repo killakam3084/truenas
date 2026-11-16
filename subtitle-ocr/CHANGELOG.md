@@ -24,5 +24,8 @@
   per-episode staging from ~40 MB to well under 1 MB.
 
 ### Fixed
+- Choose the English track with the most events instead of the default flag, and
+  withhold foreign-parts-sized results (The Boys published 2-25 cue sidecars).
+- Ignore redundant PGS clear events instead of rejecting the stream.
 - Limit directory glob matches to MKVs so newly created sidecars never become inputs.
 - Correct capital I misread by OCR as `|` or a standalone `l`, retaining raw OCR output.

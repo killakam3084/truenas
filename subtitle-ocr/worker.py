@@ -171,7 +171,8 @@ def validate(path, duration_ms, intervals=None):
     return len(cues)
 
 
-def select_track(metadata):
+def candidate_tracks(metadata):
+    """Usable English tracks of the preferred codec, most preferred first."""
     candidates = []
     for track in metadata['tracks']:
         properties = track.get('properties', {})
@@ -187,9 +188,28 @@ def select_track(metadata):
             candidates.append(track)
     if not candidates:
         raise ValueError('No supported non-forced English SRT/PGS track')
-    return min(candidates, key=lambda track: (
+    candidates.sort(key=lambda track: (
         track['properties']['codec_id'] != 'S_TEXT/UTF8',
         not track['properties'].get('default_track', False), track['id']))
+    codec = candidates[0]['properties']['codec_id']
+    return [track for track in candidates if track['properties']['codec_id'] == codec]
+
+
+def select_track(metadata):
+    return candidate_tracks(metadata)[0]
+
+
+# Full-dialogue tracks run ~12-20 cues/minute; foreign-parts-only tracks well under 1.
+MIN_CUES_PER_MINUTE = 2
+
+
+def event_count(path, codec):
+    try:
+        if codec == 'S_TEXT/UTF8':
+            return len(list(srt.parse(path.read_text(encoding='utf-8-sig'))))
+        return sum(visible for _, _, visible in presentations(path))
+    except (ValueError, UnicodeDecodeError, srt.SRTParseError):
+        return 0
 
 
 def existing_sidecar(video):
@@ -268,24 +288,42 @@ def process(video, work, min_age, dry_run, details=None, owned=None):
         if source.read(4) != b'\x1a\x45\xdf\xa3':
             raise ValueError('Invalid MKV header')
     metadata = json.loads(subprocess.check_output(['mkvmerge', '-J', str(video)]))
-    track = select_track(metadata)
+    tracks = candidate_tracks(metadata)
+    track = tracks[0]
+    codec = track['properties']['codec_id']
     duration_ms = metadata['container']['properties']['duration'] / 1_000_000
     details.update(track=track, duration_ms=duration_ms, source_fingerprint=list(before))
     if dry_run:
-        return {'status': 'planned', 'track': track['id'], 'codec': track['properties']['codec_id'],
-                'replace': replacing is not None}
+        return {'status': 'planned', 'track': track['id'], 'codec': codec,
+                'candidates': [candidate['id'] for candidate in tracks], 'replace': replacing is not None}
     staging = Path(tempfile.mkdtemp(prefix=f'{video.stem[:30]}-', dir=work))
     candidate = staging / 'subtitle.en.srt'
     details.update(staging=str(staging), candidate=str(candidate), phase='extraction')
     (staging / 'metadata.json').write_text(json.dumps(metadata, indent=2) + '\n')
+    suffix = '.srt' if codec == 'S_TEXT/UTF8' else '.sup'
+    paths = {option['id']: staging / f'track-{option["id"]}{suffix}' for option in tracks}
+    # One pass over the MKV extracts every candidate; unflagged foreign-parts tracks are common.
+    subprocess.run(['mkvextract', str(video), 'tracks', *[f'{key}:{path}' for key, path in paths.items()]],
+                   check=True)
+    counts = {key: event_count(path, codec) for key, path in paths.items()}
+    track = max(tracks, key=lambda option: counts[option['id']])
+    details.update(track=track, track_candidates=[{'id': key, 'events': value} for key, value in counts.items()])
+    for key, path in paths.items():
+        if key != track['id']:
+            path.unlink(missing_ok=True)
+    minutes = duration_ms / 60000
+    if counts[track['id']] < MIN_CUES_PER_MINUTE * minutes:
+        raise ValidationError('English track too sparse for full dialogue (likely foreign parts only)',
+                              events=counts[track['id']], minutes=round(minutes, 1),
+                              candidates=details['track_candidates'])
     intervals = None
-    if track['properties']['codec_id'] == 'S_TEXT/UTF8':
-        subprocess.run(['mkvextract', str(video), 'tracks', f'{track["id"]}:{candidate}'], check=True)
+    if codec == 'S_TEXT/UTF8':
+        paths[track['id']].rename(candidate)
         method = 'extracted-srt'
     else:
         extracted = staging / 'original.sup'
         normalized = staging / 'normalized.sup'
-        subprocess.run(['mkvextract', str(video), 'tracks', f'{track["id"]}:{extracted}'], check=True)
+        paths[track['id']].rename(extracted)
         details['phase'] = 'normalization'
         intervals = normalize(extracted, normalized)
         text = ocr_subtitle(normalized, intervals, staging, details)

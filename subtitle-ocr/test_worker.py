@@ -262,24 +262,47 @@ class WorkerTests(unittest.TestCase):
         self.assertEqual(owned_hashes(self.root), {'abc', digest(staging / 'subtitle.en.srt'),
                                                    digest(staging / 'subtitle.en.corrected.srt')})
 
-    def pgs_video(self, results):
+    def pgs_video(self, results, tracks=None, duration_ns=5_000_000_000):
         self.ocr_fixture(results)
         video = self.root / 'video.mkv'
         video.write_bytes(b'\x1a\x45\xdf\xa3')
-        metadata = {'container': {'properties': {'duration': 5_000_000_000}},
-                    'tracks': [{'id': 2, 'type': 'subtitles', 'properties': {
-                        'language': 'eng', 'codec_id': 'S_HDMV/PGS'}}]}
-        stream = (display_set(90000, True) + display_set(180000, False)
-                  + display_set(270000, True) + display_set(360000, False))
+        full = (display_set(90000, True) + display_set(180000, False)
+                + display_set(270000, True) + display_set(360000, False))
+        tracks = tracks or {2: (full, True)}
+        metadata = {'container': {'properties': {'duration': duration_ns}},
+                    'tracks': [{'id': key, 'type': 'subtitles', 'properties': {
+                        'language': 'eng', 'codec_id': 'S_HDMV/PGS', 'default_track': default}}
+                        for key, (_, default) in tracks.items()]}
 
         def extract(command, check):
-            Path(command[-1].split(':', 1)[1]).write_bytes(stream)
+            for argument in command[command.index('tracks') + 1:]:
+                key, path = argument.split(':', 1)
+                Path(path).write_bytes(tracks[int(key)][0])
 
         for active in (patch('worker.subprocess.check_output', return_value=json.dumps(metadata)),
                        patch('worker.subprocess.run', side_effect=extract)):
             active.start()
             self.addCleanup(active.stop)
         return video
+
+    def test_picks_busiest_english_track_over_sparse_default(self):
+        sparse = display_set(90000, True) + display_set(180000, False)
+        full = (display_set(90000, True) + display_set(180000, False)
+                + display_set(270000, True) + display_set(360000, False))
+        video = self.pgs_video([ocr.Recognition('Hello', []), ocr.Recognition('There', [])],
+                               tracks={2: (sparse, True), 3: (full, False)})
+        details = {}
+        result = process(video, self.root, 0, False, details)
+        self.assertEqual((result['status'], result['cues'], details['track']['id']), ('published', 2, 3))
+        self.assertEqual(details['track_candidates'], [{'id': 2, 'events': 1}, {'id': 3, 'events': 2}])
+        self.assertEqual(sorted(path.name for path in Path(result['staging']).glob('track-*')), [])
+
+    def test_withholds_when_only_foreign_parts_track_exists(self):
+        video = self.pgs_video([], duration_ns=3_600_000_000_000)
+        with self.assertRaises(ValidationError) as failure:
+            process(video, self.root, 0, False, {})
+        self.assertEqual((failure.exception.details['events'], failure.exception.details['minutes']), (2, 60.0))
+        self.assertFalse(video.with_suffix('.en.srt').exists())
 
     def test_successful_ocr_prunes_pgs_copies_but_keeps_text(self):
         video = self.pgs_video([ocr.Recognition('Hello', []), ocr.Recognition('There', [])])
