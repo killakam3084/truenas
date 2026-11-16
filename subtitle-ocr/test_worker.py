@@ -28,6 +28,15 @@ class WorkerTests(unittest.TestCase):
         self.temporary = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary.cleanup)
         self.root = Path(self.temporary.name)
+        self.sync_result = {'sync_was_successful': True, 'offset_seconds': 0.8, 'framerate_scale_factor': 1.0}
+
+        def sync(video, source, destination, *options):
+            destination.write_bytes(source.read_bytes())
+            return self.sync_result
+
+        synchronizing = patch('worker.synchronize', side_effect=sync)
+        self.synchronize = synchronizing.start()
+        self.addCleanup(synchronizing.stop)
 
     def test_reorders_complete_sets_without_changing_bytes(self):
         source = self.root / 'source.sup'
@@ -365,7 +374,19 @@ class WorkerTests(unittest.TestCase):
         result = process(video, self.root, 0, False, details)
         self.assertEqual((result['status'], result['method']), ('published', 'extracted-untagged-srt'))
         self.assertGreaterEqual(details['english_ratio'], 0.2)
+        self.assertEqual(details['sync']['offset_seconds'], 0.8)
+        self.assertIn('--no-fix-framerate', self.synchronize.call_args.args)
+        self.assertTrue((Path(result['staging']) / 'extracted.srt').is_file())
         self.assertTrue(video.with_suffix('.en.srt').is_file())
+
+    def test_untrustworthy_text_alignment_is_withheld(self):
+        video = self.untagged_text_video({2: ['WELCOME TO THE SHOW.', 'AND THAT IS WHAT WE HAVE.'] * 2})
+        for result in ({'sync_was_successful': False, 'offset_seconds': 0.5},
+                       {'sync_was_successful': True, 'offset_seconds': 9.0}):
+            self.sync_result = result
+            with self.subTest(result=result), self.assertRaisesRegex(ValidationError, 'alignment'):
+                process(video, self.root, 0, False, {})
+        self.assertFalse(video.with_suffix('.en.srt').exists())
 
     def test_untagged_foreign_text_track_is_withheld(self):
         video = self.untagged_text_video({2: ['Bienvenidos al programa.', 'Esto es lo que tenemos hoy.'] * 2})

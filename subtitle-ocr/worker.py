@@ -233,6 +233,18 @@ def english_ratio(path):
     return sum(word in ENGLISH_WORDS for word in words) / len(words) if words else 0.0
 
 
+# Embedded text shares the video's clock; only small caption lag is expected, never a rate change.
+MAX_EMBEDDED_OFFSET_SECONDS = 5
+
+
+def synchronize(video, source, destination, *options):
+    from ffsubsync.ffsubsync import make_parser, run
+    arguments = make_parser().parse_args([str(video), '-i', str(source), '-o', str(destination),
+                                          '--output-encoding', 'utf-8', *options])
+    result = run(arguments)
+    return {key: result.get(key) for key in ('sync_was_successful', 'offset_seconds', 'framerate_scale_factor')}
+
+
 def existing_sidecar(video):
     for language in ('', '.en', '.eng'):
         for variant in ('', '.sdh', '.hi', '.cc'):
@@ -348,7 +360,13 @@ def process(video, work, min_age, dry_run, details=None, owned=None):
                                   english_ratio=ratio, track_id=track['id'])
     intervals = None
     if codec == 'S_TEXT/UTF8':
-        paths[track['id']].rename(candidate)
+        details['phase'] = 'synchronization'
+        sync = synchronize(video, paths[track['id']], candidate, '--no-fix-framerate',
+                           '--max-offset-seconds', str(MAX_EMBEDDED_OFFSET_SECONDS))
+        details['sync'] = sync
+        if not sync.get('sync_was_successful') or abs(sync.get('offset_seconds') or 0) > MAX_EMBEDDED_OFFSET_SECONDS:
+            raise ValidationError('Audio alignment not trustworthy', **sync)
+        paths[track['id']].rename(staging / 'extracted.srt')
         method = 'extracted-srt' if track_language(track) in ('en', 'eng') else 'extracted-untagged-srt'
     else:
         extracted = staging / 'original.sup'

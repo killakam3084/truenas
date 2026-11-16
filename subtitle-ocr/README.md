@@ -37,6 +37,10 @@ completion. No watcher or downloader integration is installed by this MVP.
 - Text tracks with no language tag (`und`) are used only when no English-tagged
   track exists, and are published only if their text reads as English (common
   English word ratio of at least 20%); otherwise the file is withheld.
+- Extracted text tracks are aligned to the audio with ffsubsync (offset only, at
+  most 5 seconds; broadcast captions commonly lag). An untrustworthy alignment
+  withholds the file; the unaligned track is kept as `extracted.srt` in staging.
+  PGS timing comes from the disc and is used as-is.
 - `--replace-own` regenerates an existing `.en.srt` only if its exact bytes match an
   earlier output of this tool (a `sha256` in `results.jsonl` or a retained staging
   candidate). Any other sidecar is still skipped. The previous file is kept as

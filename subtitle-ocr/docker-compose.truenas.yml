@@ -1,6 +1,6 @@
 services:
   subtitle-ocr:
-    image: truenas/subtitle-ocr:0.2.0
+    image: truenas/subtitle-ocr:0.3.0
     build:
       context: .
       target: ocr
@@ -35,7 +35,7 @@ services:
           create_host_path: false
 
   subtitle-fetch:
-    image: truenas/subtitle-fetch:0.1.0
+    image: truenas/subtitle-fetch:0.2.0
     build:
       context: .
       target: fetch

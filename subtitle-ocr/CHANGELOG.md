@@ -3,6 +3,9 @@
 ## [Unreleased]
 
 ### Added
+- Align extracted text tracks to the audio with ffsubsync (offset-only, 5-second
+  cap), sharing the downloader's synchronization; ffmpeg and ffsubsync move into
+  the common image stage (images `subtitle-ocr:0.3.0`, `subtitle-fetch:0.2.0`).
 - Extract untagged (`und`) SRT tracks as `.en.srt` when no English-tagged track
   exists and the text verifies as English; inventory reports them as
   `embedded-text-untagged`. Plex often ignores untagged embedded tracks.

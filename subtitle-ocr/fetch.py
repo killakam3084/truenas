@@ -14,7 +14,7 @@ import uuid
 import srt
 
 from worker import (MIN_CUES_PER_MINUTE, ValidationError, digest, existing_sidecar, fingerprint, publish,
-                    runtime_context, validate)
+                    runtime_context, synchronize, validate)
 
 VIDEO_SUFFIXES = {'.mkv', '.mp4', '.m4v', '.avi', '.ts', '.m2ts'}
 PROVIDER = 'opensubtitlescom'
@@ -83,14 +83,6 @@ def probe_duration_ms(video):
     output = subprocess.check_output(['ffprobe', '-v', 'error', '-show_entries', 'format=duration',
                                       '-of', 'default=noprint_wrappers=1:nokey=1', str(video)])
     return float(output) * 1000
-
-
-def synchronize(video, source, destination):
-    from ffsubsync.ffsubsync import make_parser, run
-    arguments = make_parser().parse_args([str(video), '-i', str(source), '-o', str(destination),
-                                          '--output-encoding', 'utf-8'])
-    result = run(arguments)
-    return {key: result.get(key) for key in ('sync_was_successful', 'offset_seconds', 'framerate_scale_factor')}
 
 
 class Fetcher:
