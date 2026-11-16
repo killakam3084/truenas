@@ -34,6 +34,9 @@ completion. No watcher or downloader integration is installed by this MVP.
 
 - Existing bare, English, and English SDH/HI/CC SRT sidecars are skipped, including
   symlinks. Embedded forced tracks are not substituted for full dialogue tracks.
+- Text tracks with no language tag (`und`) are used only when no English-tagged
+  track exists, and are published only if their text reads as English (common
+  English word ratio of at least 20%); otherwise the file is withheld.
 - `--replace-own` regenerates an existing `.en.srt` only if its exact bytes match an
   earlier output of this tool (a `sha256` in `results.jsonl` or a retained staging
   candidate). Any other sidecar is still skipped. The previous file is kept as
@@ -106,7 +109,7 @@ scan if Plex has not detected the external English SRT.
 
 `inventory.py` is a read-only report: it classifies every video under the given
 roots as already covered (`sidecar-own`, `sidecar-other`), processable by the worker
-(`embedded-text`, `embedded-pgs`), or needing other work (`embedded-unsupported`,
+(`embedded-text`, `embedded-text-untagged`, `embedded-pgs`), or needing other work (`embedded-unsupported`,
 `forced-only`, `no-english`, `error`), and writes per-file JSONL to `/work`. Mount
 the library read-only:
 

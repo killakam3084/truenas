@@ -36,6 +36,8 @@ class InventoryTests(unittest.TestCase):
             ([track('S_TEXT/UTF8', forced_track=True)], 'forced-only'),
             ([track('S_TEXT/UTF8', tag_number_of_bytes='0')], 'forced-only'),
             ([track('S_TEXT/UTF8', language='spa')], 'no-english'),
+            ([track('S_TEXT/UTF8', language='und')], 'embedded-text-untagged'),
+            ([track('S_HDMV/PGS', language='und')], 'no-english'),
             ([], 'no-english'),
         ]
         for tracks, expected in cases:

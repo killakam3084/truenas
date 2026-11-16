@@ -7,7 +7,7 @@ from pathlib import Path
 import subprocess
 import time
 
-from worker import digest, existing_sidecar, owned_hashes
+from worker import digest, existing_sidecar, owned_hashes, untagged_text_tracks
 
 VIDEO_SUFFIXES = {'.mkv', '.mp4', '.m4v', '.avi', '.ts', '.m2ts'}
 SUPPORTED = {'S_TEXT/UTF8': 'embedded-text', 'S_HDMV/PGS': 'embedded-pgs'}
@@ -40,6 +40,8 @@ def classify(video, owned):
             return {'category': category, 'codecs': codecs}
     if full:
         return {'category': 'embedded-unsupported', 'codecs': codecs}
+    if untagged_text_tracks(metadata):
+        return {'category': 'embedded-text-untagged', 'codecs': codecs}
     return {'category': 'forced-only' if tracks else 'no-english', 'codecs': codecs}
 
 

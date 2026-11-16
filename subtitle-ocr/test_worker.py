@@ -338,6 +338,46 @@ class WorkerTests(unittest.TestCase):
                 process(video, self.root, 0, False)
         self.assertFalse(video.with_suffix('.en.srt').exists())
 
+    def untagged_text_video(self, texts, extra_tracks=()):
+        video = self.root / 'video.mkv'
+        video.write_bytes(b'\x1a\x45\xdf\xa3')
+        metadata = {'container': {'properties': {'duration': 60_000_000_000}},
+                    'tracks': [{'id': key, 'type': 'subtitles', 'properties': {
+                        'language': 'und', 'codec_id': 'S_TEXT/UTF8', 'default_track': key == 2}}
+                        for key in texts] + list(extra_tracks)}
+
+        def extract(command, check):
+            for argument in command[command.index('tracks') + 1:]:
+                key, path = argument.split(':', 1)
+                Path(path).write_text(''.join(f'{n}\n00:00:{n:02},000 --> 00:00:{n:02},500\n{line}\n\n'
+                                              for n, line in enumerate(texts[int(key)], 1)))
+
+        for active in (patch('worker.subprocess.check_output', return_value=json.dumps(metadata)),
+                       patch('worker.subprocess.run', side_effect=extract)):
+            active.start()
+            self.addCleanup(active.stop)
+        return video
+
+    def test_untagged_text_track_published_when_it_reads_as_english(self):
+        video = self.untagged_text_video({2: ['John: WELCOME TO THE SHOW.', 'AND THAT IS WHAT WE HAVE.'] * 2})
+        details = {}
+        result = process(video, self.root, 0, False, details)
+        self.assertEqual((result['status'], result['method']), ('published', 'extracted-untagged-srt'))
+        self.assertGreaterEqual(details['english_ratio'], 0.2)
+        self.assertTrue(video.with_suffix('.en.srt').is_file())
+
+    def test_untagged_foreign_text_track_is_withheld(self):
+        video = self.untagged_text_video({2: ['Bienvenidos al programa.', 'Esto es lo que tenemos hoy.'] * 2})
+        with self.assertRaisesRegex(ValidationError, 'does not read as English'):
+            process(video, self.root, 0, False, {})
+        self.assertFalse(video.with_suffix('.en.srt').exists())
+
+    def test_untagged_tracks_ignored_when_english_track_exists(self):
+        tagged = {'id': 4, 'type': 'subtitles', 'properties': {'language': 'eng', 'codec_id': 'S_HDMV/PGS'}}
+        metadata = {'tracks': [{'id': 2, 'type': 'subtitles', 'properties': {
+            'language': 'und', 'codec_id': 'S_TEXT/UTF8'}}, tagged]}
+        self.assertEqual(select_track(metadata)['id'], 4)
+
 
 if __name__ == '__main__':
     unittest.main()

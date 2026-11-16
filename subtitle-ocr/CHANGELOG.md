@@ -3,6 +3,9 @@
 ## [Unreleased]
 
 ### Added
+- Extract untagged (`und`) SRT tracks as `.en.srt` when no English-tagged track
+  exists and the text verifies as English; inventory reports them as
+  `embedded-text-untagged`. Plex often ignores untagged embedded tracks.
 - `--replace-own` to regenerate only sidecars this tool produced (hash-proven), with
   backup and atomic replacement; published results now record the sidecar `sha256`.
 - In-process OCR engine (image 0.2.0): Python PGS decoder plus Debian `libtesseract`

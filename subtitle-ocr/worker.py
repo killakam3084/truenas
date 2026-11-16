@@ -171,21 +171,30 @@ def validate(path, duration_ms, intervals=None):
     return len(cues)
 
 
+def track_language(track):
+    properties = track.get('properties', {})
+    return (properties.get('language_ietf') or properties.get('language', '')).split('-')[0]
+
+
+def usable(track):
+    properties = track.get('properties', {})
+    return (track['type'] == 'subtitles' and not properties.get('forced_track')
+            and str(properties.get('tag_number_of_bytes', 'unknown')) != '0')
+
+
+def untagged_text_tracks(metadata):
+    """Language-less SRT tracks; only content verification can make them English."""
+    return [track for track in metadata['tracks'] if usable(track) and track_language(track) in ('und', '')
+            and track['properties'].get('codec_id') == 'S_TEXT/UTF8']
+
+
 def candidate_tracks(metadata):
     """Usable English tracks of the preferred codec, most preferred first."""
-    candidates = []
-    for track in metadata['tracks']:
-        properties = track.get('properties', {})
-        language = properties.get('language_ietf') or properties.get('language', '')
-        if track['type'] != 'subtitles' or language.split('-')[0] not in ('en', 'eng'):
-            continue
-        if properties.get('forced_track'):
-            continue
-        if str(properties.get('tag_number_of_bytes', 'unknown')) == '0':
-            continue
-        codec = properties.get('codec_id')
-        if codec in ('S_TEXT/UTF8', 'S_HDMV/PGS'):
-            candidates.append(track)
+    candidates = [track for track in metadata['tracks'] if usable(track)
+                  and track_language(track) in ('en', 'eng')
+                  and track['properties'].get('codec_id') in ('S_TEXT/UTF8', 'S_HDMV/PGS')]
+    if not candidates:
+        candidates = untagged_text_tracks(metadata)
     if not candidates:
         raise ValueError('No supported non-forced English SRT/PGS track')
     candidates.sort(key=lambda track: (
@@ -210,6 +219,18 @@ def event_count(path, codec):
         return sum(visible for _, _, visible in presentations(path))
     except (ValueError, UnicodeDecodeError, srt.SRTParseError):
         return 0
+
+
+ENGLISH_WORDS = frozenset(
+    'the and you that is it to of i what this we have be are was for with not do your my he she they '
+    'just all but know can there here it\'s i\'m don\'t'.split())
+# English dialogue runs ~35-50% of these words; other languages stay well under 10%.
+MIN_ENGLISH_RATIO = 0.2
+
+
+def english_ratio(path):
+    words = re.findall(r"[a-z']+", re.sub(r'<[^>]+>', ' ', path.read_text(encoding='utf-8-sig')).lower())
+    return sum(word in ENGLISH_WORDS for word in words) / len(words) if words else 0.0
 
 
 def existing_sidecar(video):
@@ -316,10 +337,16 @@ def process(video, work, min_age, dry_run, details=None, owned=None):
         raise ValidationError('English track too sparse for full dialogue (likely foreign parts only)',
                               events=counts[track['id']], minutes=round(minutes, 1),
                               candidates=details['track_candidates'])
+    if track_language(track) in ('und', ''):
+        ratio = round(english_ratio(paths[track['id']]), 3)
+        details['english_ratio'] = ratio
+        if ratio < MIN_ENGLISH_RATIO:
+            raise ValidationError('Untagged subtitle track does not read as English',
+                                  english_ratio=ratio, track_id=track['id'])
     intervals = None
     if codec == 'S_TEXT/UTF8':
         paths[track['id']].rename(candidate)
-        method = 'extracted-srt'
+        method = 'extracted-srt' if track_language(track) in ('en', 'eng') else 'extracted-untagged-srt'
     else:
         extracted = staging / 'original.sup'
         normalized = staging / 'normalized.sup'
