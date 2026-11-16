@@ -98,6 +98,22 @@ Remaining staging is small text and is what `--replace-own` uses to prove
 ownership, so keep it. Reruns skip published sidecars. Nothing rescans Plex automatically; use a library
 scan if Plex has not detected the external English SRT.
 
+## Library Inventory
+
+`inventory.py` is a read-only report: it classifies every video under the given
+roots as already covered (`sidecar-own`, `sidecar-other`), processable by the worker
+(`embedded-text`, `embedded-pgs`), or needing other work (`embedded-unsupported`,
+`forced-only`, `no-english`, `error`), and writes per-file JSONL to `/work`. Mount
+the library read-only:
+
+```sh
+docker run --rm --network none --read-only --user 950:950 \
+  -v /mnt/cell_block_d/media/video:/library:ro \
+  -v /mnt/cell_block_d/apps/subtitle-ocr/work:/work \
+  --entrypoint /opt/venv/bin/python truenas/subtitle-ocr:0.2.0 \
+  /opt/subtitle-ocr/inventory.py /library/television /library/movies
+```
+
 ## Tests
 
 ```sh
