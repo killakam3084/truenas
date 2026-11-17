@@ -62,9 +62,11 @@ class FetchTests(unittest.TestCase):
         probe.start()
         self.addCleanup(probe.stop)
 
-    def fetcher(self, pool, sync_result=None, limit=10):
+    def fetcher(self, pool, sync_result=None, limit=10, misaligned=()):
         def sync(video, source, destination):
             destination.write_bytes(source.read_bytes())
+            if source.stem.removeprefix('downloaded-') in misaligned:
+                return {'sync_was_successful': False, 'offset_seconds': -2.2, 'framerate_scale_factor': 1.0}
             return sync_result or {'sync_was_successful': True, 'offset_seconds': 1.5,
                                    'framerate_scale_factor': 1.0}
         return Fetcher(pool, score, lambda path, name: Episode(), limit, Language('eng'), sync)
@@ -102,6 +104,22 @@ class FetchTests(unittest.TestCase):
         fetcher = self.fetcher(Pool([Subtitle('good', 700)]), {'sync_was_successful': False, 'offset_seconds': 0})
         with self.assertRaises(ValidationError):
             fetcher.process(self.video, self.root, 0, False, '', {})
+        self.assertFalse(self.video.with_suffix('.en.srt').exists())
+
+    def test_misaligned_download_falls_through_to_next_candidate(self):
+        pool = Pool([Subtitle('broadcast', 760), Subtitle('web', 750)])
+        details = {}
+        result = self.fetcher(pool, misaligned={'broadcast'}).process(self.video, self.root, 0, False, '', details)
+        self.assertEqual((result['status'], details['subtitle_id'], pool.downloaded),
+                         ('published', 'web', ['broadcast', 'web']))
+        self.assertEqual([attempt['sync_was_successful'] for attempt in details['attempts']], [False, True])
+
+    def test_alignment_failures_stop_after_attempt_limit(self):
+        pool = Pool([Subtitle(str(index), 700) for index in range(5)])
+        misaligned = {str(index) for index in range(5)}
+        with self.assertRaisesRegex(ValidationError, 'any candidate'):
+            self.fetcher(pool, misaligned=misaligned).process(self.video, self.root, 0, False, '', {})
+        self.assertEqual(len(pool.downloaded), ATTEMPTS_PER_VIDEO)
         self.assertFalse(self.video.with_suffix('.en.srt').exists())
 
     def test_quota_exhaustion_stops_the_run(self):

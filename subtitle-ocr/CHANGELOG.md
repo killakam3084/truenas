@@ -3,6 +3,8 @@
 ## [Unreleased]
 
 ### Added
+- Downloads that fail audio alignment fall through to the next candidate (up to 3
+  per video); every attempt and each candidate's release name are recorded.
 - Align extracted text tracks to the audio with ffsubsync (offset-only, 5-second
   cap), sharing the downloader's synchronization; ffmpeg and ffsubsync move into
   the common image stage (images `subtitle-ocr:0.3.0`, `subtitle-fetch:0.2.0`).

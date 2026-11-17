@@ -91,6 +91,7 @@ class Fetcher:
         self.limit, self.language, self.downloads = limit, language, 0
 
     def download(self, candidates):
+        """Yield each successfully downloaded candidate, best first, within the attempt and quota limits."""
         for hash_match, score, subtitle in candidates[:ATTEMPTS_PER_VIDEO]:
             if self.downloads >= self.limit:
                 raise QuotaExhausted(f'Per-run download limit of {self.limit} reached')
@@ -99,8 +100,7 @@ class Fetcher:
             if PROVIDER in self.pool.discarded_providers:
                 raise QuotaExhausted('Provider discarded (daily quota exhausted or authentication failed)')
             if ok and subtitle.content:
-                return hash_match, score, subtitle
-        return None
+                yield hash_match, score, subtitle
 
     def process(self, path, work, min_age, dry_run, hint, details):
         details['phase'] = 'inspection'
@@ -123,28 +123,35 @@ class Fetcher:
         if PROVIDER in self.pool.discarded_providers:
             raise QuotaExhausted('Provider discarded during search')
         candidates = choose(listed, video, self.compute_score, kind)
-        details['candidates'] = [{'id': subtitle.id, 'score': score, 'hash_match': hash_match}
+        details['candidates'] = [{'id': subtitle.id, 'score': score, 'hash_match': hash_match,
+                                  'release': getattr(subtitle, 'release', None)}
                                  for hash_match, score, subtitle in candidates[:ATTEMPTS_PER_VIDEO]]
         if not candidates:
             return {'status': 'not-found', 'listed': len(listed)}
         if dry_run:
             return {'status': 'planned'}
         details['phase'] = 'download'
-        chosen = self.download(candidates)
-        if chosen is None:
-            return {'status': 'not-found', 'reason': 'downloads failed', 'listed': len(listed)}
-        hash_match, score, subtitle = chosen
-        staging = Path(tempfile.mkdtemp(prefix=f'{path.stem[:30]}-', dir=work))
-        raw, synced, candidate = staging / 'downloaded.srt', staging / 'synced.srt', staging / 'subtitle.en.srt'
-        raw.write_bytes(subtitle.content)
-        details.update(staging=str(staging), candidate=str(candidate), provider=PROVIDER, subtitle_id=subtitle.id,
-                       score=score, hash_match=hash_match, phase='synchronization')
-        sync = self.sync(path, raw, synced)
-        details['sync'] = sync
-        offset = abs(sync.get('offset_seconds') or 0)
-        if not sync.get('sync_was_successful') or offset > MAX_OFFSET_SECONDS:
-            raise ValidationError('Audio alignment not trustworthy', **sync)
-        details['phase'] = 'validation'
+        staging, attempts = None, []
+        # Subtitles cut for another release (broadcast vs extended) fail alignment; fall through to the next.
+        for hash_match, score, subtitle in self.download(candidates):
+            if staging is None:
+                staging = Path(tempfile.mkdtemp(prefix=f'{path.stem[:30]}-', dir=work))
+                details.update(staging=str(staging), provider=PROVIDER)
+            raw, synced = staging / f'downloaded-{subtitle.id}.srt', staging / f'synced-{subtitle.id}.srt'
+            raw.write_bytes(subtitle.content)
+            details['phase'] = 'synchronization'
+            sync = self.sync(path, raw, synced)
+            attempts.append({'subtitle_id': subtitle.id, **sync})
+            details['attempts'] = attempts
+            if sync.get('sync_was_successful') and abs(sync.get('offset_seconds') or 0) <= MAX_OFFSET_SECONDS:
+                break
+        else:
+            if not attempts:
+                return {'status': 'not-found', 'reason': 'downloads failed', 'listed': len(listed)}
+            raise ValidationError('Audio alignment not trustworthy for any candidate', attempts=attempts)
+        candidate = staging / 'subtitle.en.srt'
+        details.update(candidate=str(candidate), subtitle_id=subtitle.id, score=score, hash_match=hash_match,
+                       sync=sync, phase='validation')
         text, trimmed = tidy(synced.read_text(encoding='utf-8-sig'))
         with candidate.open('x', encoding='utf-8') as output:
             output.write(text)
